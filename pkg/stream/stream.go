@@ -40,7 +40,7 @@ func R(pairs ...any) Record {
 	if len(pairs)%2 != 0 {
 		panic("R() requires even number of arguments (key-value pairs)")
 	}
-	
+
 	r := make(Record)
 	for i := 0; i < len(pairs); i += 2 {
 		key := pairs[i].(string)
@@ -74,17 +74,17 @@ func Get[T any](r Record, field string) (T, bool) {
 		var zero T
 		return zero, false
 	}
-	
+
 	// Direct type assertion first (fast path)
 	if typed, ok := val.(T); ok {
 		return typed, true
 	}
-	
+
 	// Smart type conversion (slower path)
 	if converted, ok := convertTo[T](val); ok {
 		return converted, true
 	}
-	
+
 	var zero T
 	return zero, false
 }
@@ -125,20 +125,20 @@ func (r Record) Keys() []string {
 func convertTo[T any](val any) (T, bool) {
 	var zero T
 	targetType := reflect.TypeOf(zero)
-	
+
 	// Handle nil
 	if val == nil {
 		return zero, false
 	}
-	
+
 	sourceVal := reflect.ValueOf(val)
-	
+
 	// Try direct conversion for basic types
 	if sourceVal.Type().ConvertibleTo(targetType) {
 		converted := sourceVal.Convert(targetType)
 		return converted.Interface().(T), true
 	}
-	
+
 	// Custom conversions for common cases
 	switch target := any(zero).(type) {
 	case int64:
@@ -503,7 +503,7 @@ func Count[T any](stream Stream[T]) (int64, error) {
 func Max[T Comparable](stream Stream[T]) (T, error) {
 	var max T
 	first := true
-	
+
 	for {
 		val, err := stream()
 		if err != nil {
@@ -515,7 +515,7 @@ func Max[T Comparable](stream Stream[T]) (T, error) {
 			}
 			return max, err
 		}
-		
+
 		if first || val > max {
 			max = val
 			first = false
@@ -527,7 +527,7 @@ func Max[T Comparable](stream Stream[T]) (T, error) {
 func Min[T Comparable](stream Stream[T]) (T, error) {
 	var min T
 	first := true
-	
+
 	for {
 		val, err := stream()
 		if err != nil {
@@ -539,7 +539,7 @@ func Min[T Comparable](stream Stream[T]) (T, error) {
 			}
 			return min, err
 		}
-		
+
 		if first || val < min {
 			min = val
 			first = false
@@ -585,15 +585,15 @@ func ForEach[T any](fn func(T)) func(Stream[T]) error {
 // Numeric constraint for mathematical operations
 type Numeric interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-	~float32 | ~float64
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
 }
 
 // Comparable constraint for ordering operations
 type Comparable interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-	~float32 | ~float64 | ~string
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64 | ~string
 }
 
 // ============================================================================
@@ -605,7 +605,7 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
 		inputCh := make(chan T, workers)
 		outputCh := make(chan U, workers)
-		
+
 		// Start workers
 		for i := 0; i < workers; i++ {
 			go func() {
@@ -614,7 +614,7 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 				}
 			}()
 		}
-		
+
 		// Feed input
 		go func() {
 			defer close(inputCh)
@@ -625,7 +625,7 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 					close(outputCh)
 				}()
 			}()
-			
+
 			for {
 				item, err := input()
 				if err != nil {
@@ -634,7 +634,7 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 				inputCh <- item
 			}
 		}()
-		
+
 		return FromChannel(outputCh)
 	}
 }

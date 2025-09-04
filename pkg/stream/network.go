@@ -13,19 +13,19 @@ import (
 type NetFlow struct {
 	// Core flow identifiers
 	SrcIP    uint32 // Source IP address
-	DstIP    uint32 // Destination IP address  
+	DstIP    uint32 // Destination IP address
 	SrcPort  uint16 // Source port
 	DstPort  uint16 // Destination port
 	Protocol uint8  // IP protocol (TCP=6, UDP=17, etc.)
-	
+
 	// Timing information
 	StartTime time.Time     // Flow start time
 	Duration  time.Duration // Flow duration
-	
+
 	// Traffic counters
 	Bytes   uint64 // Total bytes
 	Packets uint64 // Total packets
-	
+
 	// Additional metadata
 	TCPFlags uint8  // TCP flags (SYN, ACK, FIN, etc.)
 	ToS      uint8  // Type of Service
@@ -130,7 +130,7 @@ func (psa PortScanAlert) String() string {
 type DDoSAlert struct {
 	DstIP     uint32        // Destination IP under attack
 	PPS       uint64        // Packets per second
-	BPS       uint64        // Bytes per second  
+	BPS       uint64        // Bytes per second
 	Severity  float64       // Attack severity score
 	Duration  time.Duration // Attack duration
 	FlowCount int           // Number of flows involved
@@ -145,18 +145,18 @@ func (da DDoSAlert) String() string {
 // TrafficMatrix represents network traffic flows between sources/destinations
 type TrafficMatrix struct {
 	Dimension int                    // Matrix size (N x N)
-	Sources   []uint32              // Source IP addresses
+	Sources   []uint32               // Source IP addresses
 	Flows     map[string]FlowSummary // [srcIP,dstIP] -> summary
 }
 
 // FlowSummary summarizes traffic between two endpoints
 type FlowSummary struct {
-	Bytes      uint64        // Total bytes
-	Packets    uint64        // Total packets
-	Flows      int           // Number of flows
-	FirstSeen  time.Time     // First flow timestamp
-	LastSeen   time.Time     // Last flow timestamp
-	Protocols  map[uint8]int // Protocol distribution
+	Bytes     uint64        // Total bytes
+	Packets   uint64        // Total packets
+	Flows     int           // Number of flows
+	FirstSeen time.Time     // First flow timestamp
+	LastSeen  time.Time     // Last flow timestamp
+	Protocols map[uint8]int // Protocol distribution
 }
 
 // ============================================================================
@@ -195,7 +195,7 @@ func FilterByPort(port uint16) Filter[NetFlow, NetFlow] {
 func FilterByIPRange(startIP, endIP uint32) Filter[NetFlow, NetFlow] {
 	return Where(func(flow NetFlow) bool {
 		return (flow.SrcIP >= startIP && flow.SrcIP <= endIP) ||
-		       (flow.DstIP >= startIP && flow.DstIP <= endIP)
+			(flow.DstIP >= startIP && flow.DstIP <= endIP)
 	})
 }
 
@@ -207,32 +207,32 @@ func GroupByEndpoints() Filter[NetFlow, Record] {
 		if err != nil {
 			return func() (Record, error) { return Record{}, err }
 		}
-		
+
 		// Group by source-destination pairs
 		groups := make(map[string][]NetFlow)
 		for _, flow := range flows {
 			key := fmt.Sprintf("%d-%d", flow.SrcIP, flow.DstIP)
 			groups[key] = append(groups[key], flow)
 		}
-		
+
 		// Convert to records
 		var results []Record
 		for _, groupFlows := range groups {
 			if len(groupFlows) == 0 {
 				continue
 			}
-			
+
 			first := groupFlows[0]
-			
+
 			var totalBytes, totalPackets uint64
 			protocols := make(map[uint8]int)
-			
+
 			for _, flow := range groupFlows {
 				totalBytes += flow.Bytes
 				totalPackets += flow.Packets
 				protocols[flow.Protocol]++
 			}
-			
+
 			result := R(
 				"src_ip", first.SrcIP,
 				"dst_ip", first.DstIP,
@@ -241,10 +241,10 @@ func GroupByEndpoints() Filter[NetFlow, Record] {
 				"flow_count", len(groupFlows),
 				"protocols", protocols,
 			)
-			
+
 			results = append(results, result)
 		}
-		
+
 		return FromSlice(results)
 	}
 }
@@ -285,17 +285,17 @@ func FromNetFlows(flows []NetFlow) Stream[NetFlow] {
 // GenerateTestFlows creates synthetic network flows for testing
 func GenerateTestFlows(count int) []NetFlow {
 	flows := make([]NetFlow, count)
-	
+
 	// Create some "heavy hitters" for realistic distribution
 	heavyHitters := []uint32{
 		0xC0A80101, // 192.168.1.1
 		0xC0A80102, // 192.168.1.2
 		0xC0A80103, // 192.168.1.3
 	}
-	
+
 	for i := 0; i < count; i++ {
 		var srcIP, dstIP uint32
-		
+
 		// 30% of traffic from heavy hitters
 		if i%3 == 0 {
 			srcIP = heavyHitters[i%len(heavyHitters)]
@@ -304,7 +304,7 @@ func GenerateTestFlows(count int) []NetFlow {
 			srcIP = uint32(0xC0A80000 + (i % 256))
 			dstIP = uint32(0xC0A80100 + (i % 256))
 		}
-		
+
 		flows[i] = NetFlow{
 			SrcIP:     srcIP,
 			DstIP:     dstIP,
@@ -316,6 +316,6 @@ func GenerateTestFlows(count int) []NetFlow {
 			StartTime: time.Now().Add(-time.Duration(i) * time.Second),
 		}
 	}
-	
+
 	return flows
 }

@@ -1,0 +1,1852 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>stream: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/rosscartlidge/streamv2/pkg/stream/nested_streams.go (0.0%)</option>
+				
+				<option value="file1">github.com/rosscartlidge/streamv2/pkg/stream/network.go (0.0%)</option>
+				
+				<option value="file2">github.com/rosscartlidge/streamv2/pkg/stream/processor.go (0.0%)</option>
+				
+				<option value="file3">github.com/rosscartlidge/streamv2/pkg/stream/stream.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package stream
+
+import (
+        "fmt"
+)
+
+// ============================================================================
+// NESTED STREAM SUPPORT - STREAMS AS RECORD FIELDS
+// ============================================================================
+
+// StreamValue wraps a stream to be stored in records
+type StreamValue[T any] struct {
+        stream Stream[T]
+        cached []T // Cache for multiple iterations
+        index  int // Current position in cache
+}
+
+// NewStreamValue creates a StreamValue from a stream
+func NewStreamValue[T any](stream Stream[T]) *StreamValue[T] <span class="cov0" title="0">{
+        return &amp;StreamValue[T]{
+                stream: stream,
+                cached: nil,
+                index:  0,
+        }
+}</span>
+
+// Stream returns the underlying stream
+func (sv *StreamValue[T]) Stream() Stream[T] <span class="cov0" title="0">{
+        if sv.cached != nil </span><span class="cov0" title="0">{
+                // Return cached stream
+                return sv.cachedStream()
+        }</span>
+        <span class="cov0" title="0">return sv.stream</span>
+}
+
+// cachedStream creates a stream from cached data
+func (sv *StreamValue[T]) cachedStream() Stream[T] <span class="cov0" title="0">{
+        index := 0
+        return func() (T, error) </span><span class="cov0" title="0">{
+                if index &gt;= len(sv.cached) </span><span class="cov0" title="0">{
+                        var zero T
+                        return zero, EOS
+                }</span>
+                <span class="cov0" title="0">val := sv.cached[index]
+                index++
+                return val, nil</span>
+        }
+}
+
+// Cache forces the stream to be materialized for multiple access
+func (sv *StreamValue[T]) Cache() error <span class="cov0" title="0">{
+        if sv.cached != nil </span><span class="cov0" title="0">{
+                return nil // Already cached
+        }</span>
+
+        <span class="cov0" title="0">var items []T
+        for </span><span class="cov0" title="0">{
+                item, err := sv.stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if err == EOS </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">return err</span>
+                }
+                <span class="cov0" title="0">items = append(items, item)</span>
+        }
+
+        <span class="cov0" title="0">sv.cached = items
+        sv.index = 0
+        return nil</span>
+}
+
+// String provides string representation
+func (sv *StreamValue[T]) String() string <span class="cov0" title="0">{
+        if sv.cached != nil </span><span class="cov0" title="0">{
+                return fmt.Sprintf("StreamValue[cached:%d items]", len(sv.cached))
+        }</span>
+        <span class="cov0" title="0">return fmt.Sprintf("StreamValue[uncached]")</span>
+}
+
+// ============================================================================
+// ENHANCED RECORD OPERATIONS FOR STREAMS
+// ============================================================================
+
+// GetStream retrieves a stream from a record with type safety
+func GetStream[T any](r Record, field string) (Stream[T], bool) <span class="cov0" title="0">{
+        val, exists := r[field]
+        if !exists </span><span class="cov0" title="0">{
+                return nil, false
+        }</span>
+
+        // Check if it's a StreamValue
+        <span class="cov0" title="0">if sv, ok := val.(*StreamValue[T]); ok </span><span class="cov0" title="0">{
+                return sv.Stream(), true
+        }</span>
+
+        // Check if it's a direct stream
+        <span class="cov0" title="0">if stream, ok := val.(Stream[T]); ok </span><span class="cov0" title="0">{
+                return stream, true
+        }</span>
+
+        // Check if it's a slice that can be converted to stream
+        <span class="cov0" title="0">if slice, ok := val.([]T); ok </span><span class="cov0" title="0">{
+                return FromSlice(slice), true
+        }</span>
+
+        <span class="cov0" title="0">return nil, false</span>
+}
+
+// SetStream stores a stream in a record
+func (r Record) SetStream(field string, stream Stream[any]) Record <span class="cov0" title="0">{
+        r[field] = NewStreamValue(stream)
+        return r
+}</span>
+
+// SetTypedStream stores a typed stream in a record
+func SetTypedStream[T any](r Record, field string, stream Stream[T]) Record <span class="cov0" title="0">{
+        r[field] = NewStreamValue(stream)
+        return r
+}</span>
+
+// ============================================================================
+// STREAM RECORD CONSTRUCTORS
+// ============================================================================
+
+// RWithStream creates a record with stream fields
+func RWithStreams(pairs ...any) Record <span class="cov0" title="0">{
+        if len(pairs)%2 != 0 </span><span class="cov0" title="0">{
+                panic("RWithStreams() requires even number of arguments")</span>
+        }
+
+        <span class="cov0" title="0">r := make(Record)
+        for i := 0; i &lt; len(pairs); i += 2 </span><span class="cov0" title="0">{
+                key := pairs[i].(string)
+                value := pairs[i+1]
+
+                // Wrap streams automatically
+                if stream, ok := value.(Stream[any]); ok </span><span class="cov0" title="0">{
+                        r[key] = NewStreamValue(stream)
+                }</span> else<span class="cov0" title="0"> {
+                        r[key] = value
+                }</span>
+        }
+        <span class="cov0" title="0">return r</span>
+}
+
+// ============================================================================
+// NESTED STREAM OPERATIONS
+// ============================================================================
+
+// FlatMap flattens nested streams (stream of streams → single stream)
+func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[U] </span><span class="cov0" title="0">{
+                var currentSubStream Stream[U]
+
+                return func() (U, error) </span><span class="cov0" title="0">{
+                        for </span><span class="cov0" title="0">{
+                                // Try to get from current sub-stream
+                                if currentSubStream != nil </span><span class="cov0" title="0">{
+                                        val, err := currentSubStream()
+                                        if err == nil </span><span class="cov0" title="0">{
+                                                return val, nil
+                                        }</span>
+                                        <span class="cov0" title="0">if err != EOS </span><span class="cov0" title="0">{
+                                                var zero U
+                                                return zero, err
+                                        }</span>
+                                        // Current sub-stream is exhausted
+                                        <span class="cov0" title="0">currentSubStream = nil</span>
+                                }
+
+                                // Get next item from main stream
+                                <span class="cov0" title="0">item, err := input()
+                                if err != nil </span><span class="cov0" title="0">{
+                                        var zero U
+                                        return zero, err
+                                }</span>
+
+                                // Create new sub-stream
+                                <span class="cov0" title="0">currentSubStream = fn(item)</span>
+                        }
+                }
+        }
+}
+
+// ExpandStreams expands stream fields in records
+func ExpandStreams(streamFields ...string) Filter[Record, Record] <span class="cov0" title="0">{
+        return func(input Stream[Record]) Stream[Record] </span><span class="cov0" title="0">{
+                var currentRecord Record
+                var expandedStreams map[string]Stream[any]
+                var exhausted map[string]bool
+
+                return func() (Record, error) </span><span class="cov0" title="0">{
+                        for </span><span class="cov0" title="0">{
+                                // Initialize if needed
+                                if currentRecord == nil </span><span class="cov0" title="0">{
+                                        record, err := input()
+                                        if err != nil </span><span class="cov0" title="0">{
+                                                return nil, err
+                                        }</span>
+
+                                        <span class="cov0" title="0">currentRecord = make(Record)
+                                        expandedStreams = make(map[string]Stream[any])
+                                        exhausted = make(map[string]bool)
+
+                                        // Copy non-stream fields
+                                        for k, v := range record </span><span class="cov0" title="0">{
+                                                found := false
+                                                for _, sf := range streamFields </span><span class="cov0" title="0">{
+                                                        if k == sf </span><span class="cov0" title="0">{
+                                                                if stream, ok := GetStream[any](record, k); ok </span><span class="cov0" title="0">{
+                                                                        expandedStreams[k] = stream
+                                                                        found = true
+                                                                        break</span>
+                                                                }
+                                                        }
+                                                }
+                                                <span class="cov0" title="0">if !found </span><span class="cov0" title="0">{
+                                                        currentRecord[k] = v
+                                                }</span>
+                                        }
+                                }
+
+                                // Try to get next values from expanded streams
+                                <span class="cov0" title="0">allExhausted := true
+                                for field, stream := range expandedStreams </span><span class="cov0" title="0">{
+                                        if !exhausted[field] </span><span class="cov0" title="0">{
+                                                val, err := stream()
+                                                if err == EOS </span><span class="cov0" title="0">{
+                                                        exhausted[field] = true
+                                                }</span> else<span class="cov0" title="0"> if err != nil </span><span class="cov0" title="0">{
+                                                        return nil, err
+                                                }</span> else<span class="cov0" title="0"> {
+                                                        currentRecord[field] = val
+                                                        allExhausted = false
+                                                }</span>
+                                        }
+                                }
+
+                                <span class="cov0" title="0">if allExhausted </span><span class="cov0" title="0">{
+                                        // Move to next record
+                                        currentRecord = nil
+                                        continue</span>
+                                }
+
+                                // Return current expanded record
+                                <span class="cov0" title="0">result := make(Record)
+                                for k, v := range currentRecord </span><span class="cov0" title="0">{
+                                        result[k] = v
+                                }</span>
+                                <span class="cov0" title="0">return result, nil</span>
+                        }
+                }
+        }
+}
+
+// ============================================================================
+// EXAMPLES AND USAGE PATTERNS
+// ============================================================================
+
+// CreateNestedRecord demonstrates creating records with nested streams
+func CreateNestedRecord() Record <span class="cov0" title="0">{
+        // Create some sample streams
+        numbersStream := FromSlice([]int64{1, 2, 3, 4, 5})
+        stringsStream := FromSlice([]string{"a", "b", "c"})
+
+        // Create record with nested streams
+        record := R(
+                "id", 123,
+                "name", "example",
+        )
+
+        // Add streams to record
+        SetTypedStream(record, "numbers", numbersStream)
+        SetTypedStream(record, "letters", stringsStream)
+
+        return record
+}</span>
+
+// ProcessNestedStreams demonstrates processing records with streams
+func ProcessNestedStreams(record Record) <span class="cov0" title="0">{
+        // Extract and process nested streams
+        if numbersStream, ok := GetStream[int64](record, "numbers"); ok </span><span class="cov0" title="0">{
+                // Process the nested stream
+                sum, _ := Sum(numbersStream)
+                fmt.Printf("Sum of nested numbers: %d\n", sum)
+        }</span>
+
+        <span class="cov0" title="0">if lettersStream, ok := GetStream[string](record, "letters"); ok </span><span class="cov0" title="0">{
+                // Collect nested stream
+                letters, _ := Collect(lettersStream)
+                fmt.Printf("Nested letters: %v\n", letters)
+        }</span>
+}
+
+// GroupByWithNestedStreams groups records and creates streams of grouped data
+func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] <span class="cov0" title="0">{
+        return func(input Stream[Record]) Stream[Record] </span><span class="cov0" title="0">{
+                // Collect all records
+                records, err := Collect(input)
+                if err != nil </span><span class="cov0" title="0">{
+                        return func() (Record, error) </span><span class="cov0" title="0">{ return nil, err }</span>
+                }
+
+                // Group records
+                <span class="cov0" title="0">groups := make(map[string][]Record)
+                for _, record := range records </span><span class="cov0" title="0">{
+                        key := ""
+                        for _, field := range keyFields </span><span class="cov0" title="0">{
+                                if val, exists := record[field]; exists </span><span class="cov0" title="0">{
+                                        key += fmt.Sprintf("%v,", val)
+                                }</span>
+                        }
+                        <span class="cov0" title="0">groups[key] = append(groups[key], record)</span>
+                }
+
+                // Create results with grouped data as streams
+                <span class="cov0" title="0">var results []Record
+                for _, groupRecords := range groups </span><span class="cov0" title="0">{
+                        result := make(Record)
+
+                        // Add key fields from first record
+                        if len(groupRecords) &gt; 0 </span><span class="cov0" title="0">{
+                                for _, field := range keyFields </span><span class="cov0" title="0">{
+                                        if val, exists := groupRecords[0][field]; exists </span><span class="cov0" title="0">{
+                                                result[field] = val
+                                        }</span>
+                                }
+                        }
+
+                        // Add grouped records as a stream
+                        <span class="cov0" title="0">result["grouped_records"] = NewStreamValue(FromSlice(groupRecords))
+                        result["group_count"] = len(groupRecords)
+
+                        results = append(results, result)</span>
+                }
+
+                <span class="cov0" title="0">return FromSlice(results)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package stream
+
+import (
+        "fmt"
+        "time"
+)
+
+// ============================================================================
+// NETWORK DATA STRUCTURES
+// ============================================================================
+
+// NetFlow represents a network flow record optimized for processing
+type NetFlow struct {
+        // Core flow identifiers
+        SrcIP    uint32 // Source IP address
+        DstIP    uint32 // Destination IP address
+        SrcPort  uint16 // Source port
+        DstPort  uint16 // Destination port
+        Protocol uint8  // IP protocol (TCP=6, UDP=17, etc.)
+
+        // Timing information
+        StartTime time.Time     // Flow start time
+        Duration  time.Duration // Flow duration
+
+        // Traffic counters
+        Bytes   uint64 // Total bytes
+        Packets uint64 // Total packets
+
+        // Additional metadata
+        TCPFlags uint8  // TCP flags (SYN, ACK, FIN, etc.)
+        ToS      uint8  // Type of Service
+        ASN      uint16 // AS number
+}
+
+// FlowKey represents the unique identifier for a flow
+type FlowKey struct {
+        SrcIP    uint32
+        DstIP    uint32
+        SrcPort  uint16
+        DstPort  uint16
+        Protocol uint8
+}
+
+// Key generates a FlowKey from a NetFlow
+func (nf *NetFlow) Key() FlowKey <span class="cov0" title="0">{
+        return FlowKey{
+                SrcIP:    nf.SrcIP,
+                DstIP:    nf.DstIP,
+                SrcPort:  nf.SrcPort,
+                DstPort:  nf.DstPort,
+                Protocol: nf.Protocol,
+        }
+}</span>
+
+// String returns human-readable flow representation
+func (nf *NetFlow) String() string <span class="cov0" title="0">{
+        return fmt.Sprintf("%s:%d -&gt; %s:%d (%s) %d bytes/%d packets",
+                intToIP(nf.SrcIP), nf.SrcPort,
+                intToIP(nf.DstIP), nf.DstPort,
+                protocolToString(nf.Protocol),
+                nf.Bytes, nf.Packets)
+}</span>
+
+// ToRecord converts NetFlow to Record for generic processing
+func (nf *NetFlow) ToRecord() Record <span class="cov0" title="0">{
+        return R(
+                "src_ip", nf.SrcIP,
+                "dst_ip", nf.DstIP,
+                "src_port", nf.SrcPort,
+                "dst_port", nf.DstPort,
+                "protocol", nf.Protocol,
+                "bytes", nf.Bytes,
+                "packets", nf.Packets,
+                "start_time", nf.StartTime,
+                "duration", nf.Duration,
+                "tcp_flags", nf.TCPFlags,
+                "tos", nf.ToS,
+                "asn", nf.ASN,
+        )
+}</span>
+
+// FromRecord creates NetFlow from Record
+func NetFlowFromRecord(r Record) NetFlow <span class="cov0" title="0">{
+        return NetFlow{
+                SrcIP:     GetOr(r, "src_ip", uint32(0)),
+                DstIP:     GetOr(r, "dst_ip", uint32(0)),
+                SrcPort:   GetOr(r, "src_port", uint16(0)),
+                DstPort:   GetOr(r, "dst_port", uint16(0)),
+                Protocol:  GetOr(r, "protocol", uint8(0)),
+                Bytes:     GetOr(r, "bytes", uint64(0)),
+                Packets:   GetOr(r, "packets", uint64(0)),
+                StartTime: GetOr(r, "start_time", time.Time{}),
+                Duration:  GetOr(r, "duration", time.Duration(0)),
+                TCPFlags:  GetOr(r, "tcp_flags", uint8(0)),
+                ToS:       GetOr(r, "tos", uint8(0)),
+                ASN:       GetOr(r, "asn", uint16(0)),
+        }
+}</span>
+
+// ============================================================================
+// NETWORK ANALYTICS RESULTS
+// ============================================================================
+
+// TopTalker represents a high-traffic IP address
+type TopTalker struct {
+        IP    uint32 // IP address as uint32
+        Bytes uint64 // Total bytes
+}
+
+// String returns human-readable representation
+func (tt TopTalker) String() string <span class="cov0" title="0">{
+        return fmt.Sprintf("%s: %d bytes", intToIP(tt.IP), tt.Bytes)
+}</span>
+
+// PortScanAlert represents a detected port scan
+type PortScanAlert struct {
+        SrcIP     uint32        // Source IP performing the scan
+        PortCount int           // Number of unique ports scanned
+        Timestamp time.Time     // When the scan started
+        Duration  time.Duration // How long the scan lasted
+}
+
+// String returns human-readable representation
+func (psa PortScanAlert) String() string <span class="cov0" title="0">{
+        return fmt.Sprintf("Port scan from %s: %d ports scanned in %v",
+                intToIP(psa.SrcIP), psa.PortCount, psa.Duration)
+}</span>
+
+// DDoSAlert represents a detected DDoS attack
+type DDoSAlert struct {
+        DstIP     uint32        // Destination IP under attack
+        PPS       uint64        // Packets per second
+        BPS       uint64        // Bytes per second
+        Severity  float64       // Attack severity score
+        Duration  time.Duration // Attack duration
+        FlowCount int           // Number of flows involved
+}
+
+// String returns human-readable representation
+func (da DDoSAlert) String() string <span class="cov0" title="0">{
+        return fmt.Sprintf("DDoS attack on %s: %.0f PPS, severity %.2f",
+                intToIP(da.DstIP), float64(da.PPS), da.Severity)
+}</span>
+
+// TrafficMatrix represents network traffic flows between sources/destinations
+type TrafficMatrix struct {
+        Dimension int                    // Matrix size (N x N)
+        Sources   []uint32               // Source IP addresses
+        Flows     map[string]FlowSummary // [srcIP,dstIP] -&gt; summary
+}
+
+// FlowSummary summarizes traffic between two endpoints
+type FlowSummary struct {
+        Bytes     uint64        // Total bytes
+        Packets   uint64        // Total packets
+        Flows     int           // Number of flows
+        FirstSeen time.Time     // First flow timestamp
+        LastSeen  time.Time     // Last flow timestamp
+        Protocols map[uint8]int // Protocol distribution
+}
+
+// ============================================================================
+// NETWORK STREAM OPERATIONS
+// ============================================================================
+
+// NetFlowToRecords converts NetFlow stream to Record stream
+func NetFlowToRecords() Filter[NetFlow, Record] <span class="cov0" title="0">{
+        return Map(func(flow NetFlow) Record </span><span class="cov0" title="0">{
+                return flow.ToRecord()
+        }</span>)
+}
+
+// RecordsToNetFlow converts Record stream to NetFlow stream
+func RecordsToNetFlow() Filter[Record, NetFlow] <span class="cov0" title="0">{
+        return Map(func(r Record) NetFlow </span><span class="cov0" title="0">{
+                return NetFlowFromRecord(r)
+        }</span>)
+}
+
+// FilterByProtocol filters flows by IP protocol
+func FilterByProtocol(protocol uint8) Filter[NetFlow, NetFlow] <span class="cov0" title="0">{
+        return Where(func(flow NetFlow) bool </span><span class="cov0" title="0">{
+                return flow.Protocol == protocol
+        }</span>)
+}
+
+// FilterByPort filters flows by source or destination port
+func FilterByPort(port uint16) Filter[NetFlow, NetFlow] <span class="cov0" title="0">{
+        return Where(func(flow NetFlow) bool </span><span class="cov0" title="0">{
+                return flow.SrcPort == port || flow.DstPort == port
+        }</span>)
+}
+
+// FilterByIPRange filters flows by IP address range
+func FilterByIPRange(startIP, endIP uint32) Filter[NetFlow, NetFlow] <span class="cov0" title="0">{
+        return Where(func(flow NetFlow) bool </span><span class="cov0" title="0">{
+                return (flow.SrcIP &gt;= startIP &amp;&amp; flow.SrcIP &lt;= endIP) ||
+                        (flow.DstIP &gt;= startIP &amp;&amp; flow.DstIP &lt;= endIP)
+        }</span>)
+}
+
+// GroupByEndpoints groups flows by source and destination IP
+func GroupByEndpoints() Filter[NetFlow, Record] <span class="cov0" title="0">{
+        return func(input Stream[NetFlow]) Stream[Record] </span><span class="cov0" title="0">{
+                // Collect all flows first
+                flows, err := Collect(input)
+                if err != nil </span><span class="cov0" title="0">{
+                        return func() (Record, error) </span><span class="cov0" title="0">{ return Record{}, err }</span>
+                }
+
+                // Group by source-destination pairs
+                <span class="cov0" title="0">groups := make(map[string][]NetFlow)
+                for _, flow := range flows </span><span class="cov0" title="0">{
+                        key := fmt.Sprintf("%d-%d", flow.SrcIP, flow.DstIP)
+                        groups[key] = append(groups[key], flow)
+                }</span>
+
+                // Convert to records
+                <span class="cov0" title="0">var results []Record
+                for _, groupFlows := range groups </span><span class="cov0" title="0">{
+                        if len(groupFlows) == 0 </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+
+                        <span class="cov0" title="0">first := groupFlows[0]
+
+                        var totalBytes, totalPackets uint64
+                        protocols := make(map[uint8]int)
+
+                        for _, flow := range groupFlows </span><span class="cov0" title="0">{
+                                totalBytes += flow.Bytes
+                                totalPackets += flow.Packets
+                                protocols[flow.Protocol]++
+                        }</span>
+
+                        <span class="cov0" title="0">result := R(
+                                "src_ip", first.SrcIP,
+                                "dst_ip", first.DstIP,
+                                "total_bytes", totalBytes,
+                                "total_packets", totalPackets,
+                                "flow_count", len(groupFlows),
+                                "protocols", protocols,
+                        )
+
+                        results = append(results, result)</span>
+                }
+
+                <span class="cov0" title="0">return FromSlice(results)</span>
+        }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// intToIP converts uint32 to IP string
+func intToIP(ip uint32) string <span class="cov0" title="0">{
+        return fmt.Sprintf("%d.%d.%d.%d",
+                byte(ip&gt;&gt;24), byte(ip&gt;&gt;16), byte(ip&gt;&gt;8), byte(ip))
+}</span>
+
+// protocolToString converts protocol number to string
+func protocolToString(proto uint8) string <span class="cov0" title="0">{
+        switch proto </span>{
+        case 1:<span class="cov0" title="0">
+                return "ICMP"</span>
+        case 6:<span class="cov0" title="0">
+                return "TCP"</span>
+        case 17:<span class="cov0" title="0">
+                return "UDP"</span>
+        default:<span class="cov0" title="0">
+                return fmt.Sprintf("Proto-%d", proto)</span>
+        }
+}
+
+// ============================================================================
+// NETWORK STREAM CONSTRUCTORS
+// ============================================================================
+
+// FromNetFlows creates a stream from NetFlow slice
+func FromNetFlows(flows []NetFlow) Stream[NetFlow] <span class="cov0" title="0">{
+        return FromSlice(flows)
+}</span>
+
+// GenerateTestFlows creates synthetic network flows for testing
+func GenerateTestFlows(count int) []NetFlow <span class="cov0" title="0">{
+        flows := make([]NetFlow, count)
+
+        // Create some "heavy hitters" for realistic distribution
+        heavyHitters := []uint32{
+                0xC0A80101, // 192.168.1.1
+                0xC0A80102, // 192.168.1.2
+                0xC0A80103, // 192.168.1.3
+        }
+
+        for i := 0; i &lt; count; i++ </span><span class="cov0" title="0">{
+                var srcIP, dstIP uint32
+
+                // 30% of traffic from heavy hitters
+                if i%3 == 0 </span><span class="cov0" title="0">{
+                        srcIP = heavyHitters[i%len(heavyHitters)]
+                        dstIP = uint32(0xC0A80000 + (i % 256))
+                }</span> else<span class="cov0" title="0"> {
+                        srcIP = uint32(0xC0A80000 + (i % 256))
+                        dstIP = uint32(0xC0A80100 + (i % 256))
+                }</span>
+
+                <span class="cov0" title="0">flows[i] = NetFlow{
+                        SrcIP:     srcIP,
+                        DstIP:     dstIP,
+                        SrcPort:   uint16(32768 + (i % 32768)),
+                        DstPort:   uint16(80 + (i % 1000)),
+                        Protocol:  6, // TCP
+                        Bytes:     uint64(64 + (i % 1400)),
+                        Packets:   uint64(1 + (i % 10)),
+                        StartTime: time.Now().Add(-time.Duration(i) * time.Second),
+                }</span>
+        }
+
+        <span class="cov0" title="0">return flows</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package stream
+
+import (
+        "runtime"
+        "time"
+)
+
+// ============================================================================
+// PROCESSOR INTERFACE - UNIFIED CPU/GPU ABSTRACTION
+// ============================================================================
+
+// Processor provides high-performance analytics with automatic backend selection
+type Processor interface {
+        // Network analytics
+        TopTalkers(topN int) func([]NetFlow) []TopTalker
+        PortScanDetection(timeWindow time.Duration, threshold int) func([]NetFlow) []PortScanAlert
+        DDoSDetection(baseline, threshold float64) func([]NetFlow) []DDoSAlert
+        TrafficMatrix() func([]NetFlow) TrafficMatrix
+
+        // Statistical operations
+        StatsInt64(percentiles []float64) func([]int64) StatsSummary
+        StatsFloat64(percentiles []float64) func([]float64) StatsSummary
+        HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64
+        HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64
+
+        // System info
+        Capabilities() ProcessorInfo
+        Metrics() ProcessorMetrics
+        Close() error
+}
+
+// ProcessorInfo describes processor capabilities
+type ProcessorInfo struct {
+        Backend      string    // "CPU", "GPU", or "Hybrid"
+        CPUCores     int       // Available CPU cores
+        GPUDevices   []GPUInfo // Available GPU devices
+        MaxBatchSize int       // Optimal batch size
+        Memory       int64     // Available memory (bytes)
+}
+
+// GPUInfo describes a GPU device
+type GPUInfo struct {
+        ID          int    // GPU device ID
+        Name        string // GPU name
+        Memory      int64  // GPU memory (bytes)
+        Cores       int    // CUDA cores
+        ComputeCaps string // Compute capability
+}
+
+// ProcessorMetrics tracks performance
+type ProcessorMetrics struct {
+        RecordsProcessed int64         // Total records processed
+        AverageLatency   time.Duration // Average operation latency
+        ThroughputRPS    float64       // Records per second
+        BackendUsage     BackendUsage  // Backend utilization
+}
+
+// BackendUsage tracks CPU/GPU utilization
+type BackendUsage struct {
+        CPUUsage float64 // CPU utilization (0-100%)
+        GPUUsage float64 // GPU utilization (0-100%)
+        Mode     string  // "CPU", "GPU", or "Adaptive"
+}
+
+// ============================================================================
+// PROCESSOR FACTORY - AUTOMATIC BACKEND SELECTION
+// ============================================================================
+
+// NewProcessor creates the best processor for the current system
+func NewProcessor(opts ...ProcessorOption) Processor <span class="cov0" title="0">{
+        config := &amp;ProcessorConfig{
+                PreferGPU:     true,
+                FallbackToCPU: true,
+                Adaptive:      true,
+                MaxWorkers:    runtime.NumCPU(),
+                BatchSize:     100000,
+                MemoryLimit:   1024 * 1024 * 1024, // 1GB default
+        }
+
+        // Apply options
+        for _, opt := range opts </span><span class="cov0" title="0">{
+                opt(config)
+        }</span>
+
+        // Try GPU first if preferred
+        <span class="cov0" title="0">if config.PreferGPU </span><span class="cov0" title="0">{
+                if gpu, err := newGPUProcessor(config); err == nil </span><span class="cov0" title="0">{
+                        return &amp;adaptiveProcessor{
+                                gpu:    gpu,
+                                cpu:    newCPUProcessor(config),
+                                config: config,
+                        }
+                }</span>
+        }
+
+        // Fallback to CPU or fail
+        <span class="cov0" title="0">if config.FallbackToCPU </span><span class="cov0" title="0">{
+                return newCPUProcessor(config)
+        }</span>
+
+        <span class="cov0" title="0">panic("No suitable processor available")</span>
+}
+
+// ProcessorConfig configures processor behavior
+type ProcessorConfig struct {
+        PreferGPU     bool
+        FallbackToCPU bool
+        Adaptive      bool
+        MaxWorkers    int
+        BatchSize     int
+        MemoryLimit   int64
+        GPUDevice     int
+}
+
+// ProcessorOption configures a processor
+type ProcessorOption func(*ProcessorConfig)
+
+// WithCPUOnly forces CPU-only processing
+func WithCPUOnly() ProcessorOption <span class="cov0" title="0">{
+        return func(c *ProcessorConfig) </span><span class="cov0" title="0">{
+                c.PreferGPU = false
+                c.FallbackToCPU = true
+        }</span>
+}
+
+// WithGPUPreferred tries GPU first, falls back to CPU
+func WithGPUPreferred() ProcessorOption <span class="cov0" title="0">{
+        return func(c *ProcessorConfig) </span><span class="cov0" title="0">{
+                c.PreferGPU = true
+                c.FallbackToCPU = true
+        }</span>
+}
+
+// WithBatchSize sets optimal batch size
+func WithBatchSize(size int) ProcessorOption <span class="cov0" title="0">{
+        return func(c *ProcessorConfig) </span><span class="cov0" title="0">{
+                c.BatchSize = size
+        }</span>
+}
+
+// WithWorkers sets number of CPU workers
+func WithWorkers(workers int) ProcessorOption <span class="cov0" title="0">{
+        return func(c *ProcessorConfig) </span><span class="cov0" title="0">{
+                c.MaxWorkers = workers
+        }</span>
+}
+
+// WithMemoryLimit sets memory usage limit
+func WithMemoryLimit(bytes int64) ProcessorOption <span class="cov0" title="0">{
+        return func(c *ProcessorConfig) </span><span class="cov0" title="0">{
+                c.MemoryLimit = bytes
+        }</span>
+}
+
+// ============================================================================
+// STATISTICAL TYPES
+// ============================================================================
+
+// StatsSummary contains statistical summary
+type StatsSummary struct {
+        Count       int64               // Number of values
+        Sum         float64             // Sum of values
+        Mean        float64             // Average value
+        Min         float64             // Minimum value
+        Max         float64             // Maximum value
+        Variance    float64             // Variance
+        StdDev      float64             // Standard deviation
+        Percentiles map[float64]float64 // Requested percentiles
+}
+
+// HistogramBucketInt64 represents a histogram bucket for int64 values
+type HistogramBucketInt64 struct {
+        Min   int64 // Bucket minimum (inclusive)
+        Max   int64 // Bucket maximum (exclusive)
+        Count int64 // Number of values in bucket
+}
+
+// HistogramBucketFloat64 represents a histogram bucket for float64 values
+type HistogramBucketFloat64 struct {
+        Min   float64 // Bucket minimum (inclusive)
+        Max   float64 // Bucket maximum (exclusive)
+        Count int64   // Number of values in bucket
+}
+
+// ============================================================================
+// BATCHED PROCESSING - EFFICIENT BULK OPERATIONS
+// ============================================================================
+
+// Batched processes stream elements in batches for better performance
+func Batched[T, U any](batchSize int, processor func([]T) []U) Filter[T, U] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[U] </span><span class="cov0" title="0">{
+                var batch []T
+                var results []U
+                var resultIndex int
+
+                return func() (U, error) </span><span class="cov0" title="0">{
+                        // Return cached results first
+                        if resultIndex &lt; len(results) </span><span class="cov0" title="0">{
+                                result := results[resultIndex]
+                                resultIndex++
+                                return result, nil
+                        }</span>
+
+                        // Collect new batch
+                        <span class="cov0" title="0">batch = batch[:0] // Reset slice but keep capacity
+                        for len(batch) &lt; batchSize </span><span class="cov0" title="0">{
+                                item, err := input()
+                                if err != nil </span><span class="cov0" title="0">{
+                                        if err == EOS &amp;&amp; len(batch) &gt; 0 </span><span class="cov0" title="0">{
+                                                break</span> // Process partial batch
+                                        }
+                                        <span class="cov0" title="0">var zero U
+                                        return zero, err</span>
+                                }
+                                <span class="cov0" title="0">batch = append(batch, item)</span>
+                        }
+
+                        <span class="cov0" title="0">if len(batch) == 0 </span><span class="cov0" title="0">{
+                                var zero U
+                                return zero, EOS
+                        }</span>
+
+                        // Process batch
+                        <span class="cov0" title="0">results = processor(batch)
+                        resultIndex = 0
+
+                        // Return first result
+                        if len(results) &gt; 0 </span><span class="cov0" title="0">{
+                                result := results[0]
+                                resultIndex = 1
+                                return result, nil
+                        }</span>
+
+                        // Empty results, try again
+                        <span class="cov0" title="0">var zero U
+                        return zero, EOS</span>
+                }
+        }
+}
+
+// ============================================================================
+// PLACEHOLDER IMPLEMENTATIONS (TO BE REPLACED WITH REAL IMPLEMENTATIONS)
+// ============================================================================
+
+// Placeholder processor types
+type adaptiveProcessor struct {
+        cpu    *cpuProcessor
+        gpu    *gpuProcessor
+        config *ProcessorConfig
+}
+
+type cpuProcessor struct {
+        config *ProcessorConfig
+}
+
+type gpuProcessor struct {
+        config *ProcessorConfig
+}
+
+// Factory functions
+func newCPUProcessor(config *ProcessorConfig) *cpuProcessor <span class="cov0" title="0">{
+        return &amp;cpuProcessor{config: config}
+}</span>
+
+func newGPUProcessor(config *ProcessorConfig) (*gpuProcessor, error) <span class="cov0" title="0">{
+        // Return error for now - GPU implementation would go here
+        return nil, EOS // Using EOS as generic error for now
+}</span>
+
+// Placeholder implementations - these would be replaced with real algorithms
+func (ap *adaptiveProcessor) TopTalkers(topN int) func([]NetFlow) []TopTalker <span class="cov0" title="0">{
+        return ap.cpu.TopTalkers(topN)
+}</span>
+
+func (ap *adaptiveProcessor) PortScanDetection(timeWindow time.Duration, threshold int) func([]NetFlow) []PortScanAlert <span class="cov0" title="0">{
+        return ap.cpu.PortScanDetection(timeWindow, threshold)
+}</span>
+
+func (ap *adaptiveProcessor) DDoSDetection(baseline, threshold float64) func([]NetFlow) []DDoSAlert <span class="cov0" title="0">{
+        return ap.cpu.DDoSDetection(baseline, threshold)
+}</span>
+
+func (ap *adaptiveProcessor) TrafficMatrix() func([]NetFlow) TrafficMatrix <span class="cov0" title="0">{
+        return ap.cpu.TrafficMatrix()
+}</span>
+
+func (ap *adaptiveProcessor) StatsInt64(percentiles []float64) func([]int64) StatsSummary <span class="cov0" title="0">{
+        return ap.cpu.StatsInt64(percentiles)
+}</span>
+
+func (ap *adaptiveProcessor) StatsFloat64(percentiles []float64) func([]float64) StatsSummary <span class="cov0" title="0">{
+        return ap.cpu.StatsFloat64(percentiles)
+}</span>
+
+func (ap *adaptiveProcessor) HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64 <span class="cov0" title="0">{
+        return ap.cpu.HistogramInt64(buckets)
+}</span>
+
+func (ap *adaptiveProcessor) HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64 <span class="cov0" title="0">{
+        return ap.cpu.HistogramFloat64(buckets)
+}</span>
+
+func (ap *adaptiveProcessor) Capabilities() ProcessorInfo <span class="cov0" title="0">{
+        return ProcessorInfo{
+                Backend:      "Hybrid",
+                CPUCores:     runtime.NumCPU(),
+                MaxBatchSize: ap.config.BatchSize,
+                Memory:       ap.config.MemoryLimit,
+        }
+}</span>
+
+func (ap *adaptiveProcessor) Metrics() ProcessorMetrics <span class="cov0" title="0">{
+        return ProcessorMetrics{
+                BackendUsage: BackendUsage{Mode: "Adaptive"},
+        }
+}</span>
+
+func (ap *adaptiveProcessor) Close() error <span class="cov0" title="0">{
+        return nil
+}</span>
+
+// CPU processor placeholder implementations
+func (cpu *cpuProcessor) TopTalkers(topN int) func([]NetFlow) []TopTalker <span class="cov0" title="0">{
+        return func(flows []NetFlow) []TopTalker </span><span class="cov0" title="0">{
+                // Placeholder - real implementation would go here
+                talkers := make(map[uint32]uint64)
+                for _, flow := range flows </span><span class="cov0" title="0">{
+                        talkers[flow.SrcIP] += flow.Bytes
+                        talkers[flow.DstIP] += flow.Bytes
+                }</span>
+
+                // Convert to slice and return top N (simplified)
+                <span class="cov0" title="0">var result []TopTalker
+                for ip, bytes := range talkers </span><span class="cov0" title="0">{
+                        result = append(result, TopTalker{IP: ip, Bytes: bytes})
+                        if len(result) &gt;= topN </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                }
+                <span class="cov0" title="0">return result</span>
+        }
+}
+
+func (cpu *cpuProcessor) PortScanDetection(timeWindow time.Duration, threshold int) func([]NetFlow) []PortScanAlert <span class="cov0" title="0">{
+        return func(flows []NetFlow) []PortScanAlert </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return []PortScanAlert{}
+        }</span>
+}
+
+func (cpu *cpuProcessor) DDoSDetection(baseline, threshold float64) func([]NetFlow) []DDoSAlert <span class="cov0" title="0">{
+        return func(flows []NetFlow) []DDoSAlert </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return []DDoSAlert{}
+        }</span>
+}
+
+func (cpu *cpuProcessor) TrafficMatrix() func([]NetFlow) TrafficMatrix <span class="cov0" title="0">{
+        return func(flows []NetFlow) TrafficMatrix </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return TrafficMatrix{}
+        }</span>
+}
+
+func (cpu *cpuProcessor) StatsInt64(percentiles []float64) func([]int64) StatsSummary <span class="cov0" title="0">{
+        return func(values []int64) StatsSummary </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return StatsSummary{Count: int64(len(values))}
+        }</span>
+}
+
+func (cpu *cpuProcessor) StatsFloat64(percentiles []float64) func([]float64) StatsSummary <span class="cov0" title="0">{
+        return func(values []float64) StatsSummary </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return StatsSummary{Count: int64(len(values))}
+        }</span>
+}
+
+func (cpu *cpuProcessor) HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64 <span class="cov0" title="0">{
+        return func(values []int64) []HistogramBucketInt64 </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return make([]HistogramBucketInt64, buckets)
+        }</span>
+}
+
+func (cpu *cpuProcessor) HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64 <span class="cov0" title="0">{
+        return func(values []float64) []HistogramBucketFloat64 </span><span class="cov0" title="0">{
+                // Placeholder implementation
+                return make([]HistogramBucketFloat64, buckets)
+        }</span>
+}
+
+func (cpu *cpuProcessor) Capabilities() ProcessorInfo <span class="cov0" title="0">{
+        return ProcessorInfo{
+                Backend:      "CPU",
+                CPUCores:     runtime.NumCPU(),
+                MaxBatchSize: cpu.config.BatchSize,
+                Memory:       cpu.config.MemoryLimit,
+        }
+}</span>
+
+func (cpu *cpuProcessor) Metrics() ProcessorMetrics <span class="cov0" title="0">{
+        return ProcessorMetrics{
+                BackendUsage: BackendUsage{Mode: "CPU"},
+        }
+}</span>
+
+func (cpu *cpuProcessor) Close() error <span class="cov0" title="0">{
+        return nil
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package stream
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "reflect"
+        "time"
+)
+
+// ============================================================================
+// STREAMV2 - GENERICS-FIRST STREAM PROCESSING LIBRARY
+// ============================================================================
+
+// EOS signals end of stream
+var EOS = errors.New("end of stream")
+
+// Stream represents a generic data stream - the heart of V2
+type Stream[T any] func() (T, error)
+
+// Filter transforms one stream into another with full type flexibility
+type Filter[T, U any] func(Stream[T]) Stream[U]
+
+// Common stream type aliases for convenience
+type RecordStream = Stream[Record]
+type IntStream = Stream[int64]
+type FloatStream = Stream[float64]
+type StringStream = Stream[string]
+type BoolStream = Stream[bool]
+
+// Record represents structured data with native Go types
+type Record map[string]any
+
+// ============================================================================
+// SMART RECORD SYSTEM - NATIVE GO TYPES
+// ============================================================================
+
+// R creates records from key-value pairs with automatic type handling
+func R(pairs ...any) Record <span class="cov0" title="0">{
+        if len(pairs)%2 != 0 </span><span class="cov0" title="0">{
+                panic("R() requires even number of arguments (key-value pairs)")</span>
+        }
+
+        <span class="cov0" title="0">r := make(Record)
+        for i := 0; i &lt; len(pairs); i += 2 </span><span class="cov0" title="0">{
+                key := pairs[i].(string)
+                r[key] = pairs[i+1] // Direct storage - no wrapping!
+        }</span>
+        <span class="cov0" title="0">return r</span>
+}
+
+// RecordFrom creates a Record from map[string]any
+func RecordFrom(m map[string]any) Record <span class="cov0" title="0">{
+        return Record(m) // Direct conversion - zero overhead!
+}</span>
+
+// RecordsFrom creates Records from slice of maps
+func RecordsFrom(maps []map[string]any) []Record <span class="cov0" title="0">{
+        records := make([]Record, len(maps))
+        for i, m := range maps </span><span class="cov0" title="0">{
+                records[i] = Record(m)
+        }</span>
+        <span class="cov0" title="0">return records</span>
+}
+
+// ============================================================================
+// TYPE-SAFE RECORD ACCESS WITH AUTOMATIC CONVERSION
+// ============================================================================
+
+// Get retrieves a typed value from a record with automatic conversion
+func Get[T any](r Record, field string) (T, bool) <span class="cov0" title="0">{
+        val, exists := r[field]
+        if !exists </span><span class="cov0" title="0">{
+                var zero T
+                return zero, false
+        }</span>
+
+        // Direct type assertion first (fast path)
+        <span class="cov0" title="0">if typed, ok := val.(T); ok </span><span class="cov0" title="0">{
+                return typed, true
+        }</span>
+
+        // Smart type conversion (slower path)
+        <span class="cov0" title="0">if converted, ok := convertTo[T](val); ok </span><span class="cov0" title="0">{
+                return converted, true
+        }</span>
+
+        <span class="cov0" title="0">var zero T
+        return zero, false</span>
+}
+
+// GetOr retrieves a typed value with a default fallback
+func GetOr[T any](r Record, field string, defaultVal T) T <span class="cov0" title="0">{
+        if val, ok := Get[T](r, field); ok </span><span class="cov0" title="0">{
+                return val
+        }</span>
+        <span class="cov0" title="0">return defaultVal</span>
+}
+
+// Set assigns a value to a record field
+func (r Record) Set(field string, value any) Record <span class="cov0" title="0">{
+        r[field] = value
+        return r
+}</span>
+
+// Has checks if a field exists
+func (r Record) Has(field string) bool <span class="cov0" title="0">{
+        _, exists := r[field]
+        return exists
+}</span>
+
+// Keys returns all field names
+func (r Record) Keys() []string <span class="cov0" title="0">{
+        keys := make([]string, 0, len(r))
+        for k := range r </span><span class="cov0" title="0">{
+                keys = append(keys, k)
+        }</span>
+        <span class="cov0" title="0">return keys</span>
+}
+
+// ============================================================================
+// SMART TYPE CONVERSION SYSTEM
+// ============================================================================
+
+func convertTo[T any](val any) (T, bool) <span class="cov0" title="0">{
+        var zero T
+        targetType := reflect.TypeOf(zero)
+
+        // Handle nil
+        if val == nil </span><span class="cov0" title="0">{
+                return zero, false
+        }</span>
+
+        <span class="cov0" title="0">sourceVal := reflect.ValueOf(val)
+
+        // Try direct conversion for basic types
+        if sourceVal.Type().ConvertibleTo(targetType) </span><span class="cov0" title="0">{
+                converted := sourceVal.Convert(targetType)
+                return converted.Interface().(T), true
+        }</span>
+
+        // Custom conversions for common cases
+        <span class="cov0" title="0">switch target := any(zero).(type) </span>{
+        case int64:<span class="cov0" title="0">
+                if converted, ok := convertToInt64(val); ok </span><span class="cov0" title="0">{
+                        return any(converted).(T), true
+                }</span>
+                <span class="cov0" title="0">return zero, false</span>
+        case float64:<span class="cov0" title="0">
+                if converted, ok := convertToFloat64(val); ok </span><span class="cov0" title="0">{
+                        return any(converted).(T), true
+                }</span>
+                <span class="cov0" title="0">return zero, false</span>
+        case string:<span class="cov0" title="0">
+                if converted, ok := convertToString(val); ok </span><span class="cov0" title="0">{
+                        return any(converted).(T), true
+                }</span>
+                <span class="cov0" title="0">return zero, false</span>
+        case bool:<span class="cov0" title="0">
+                if converted, ok := convertToBool(val); ok </span><span class="cov0" title="0">{
+                        return any(converted).(T), true
+                }</span>
+                <span class="cov0" title="0">return zero, false</span>
+        case time.Time:<span class="cov0" title="0">
+                if converted, ok := convertToTime(val); ok </span><span class="cov0" title="0">{
+                        return any(converted).(T), true
+                }</span>
+                <span class="cov0" title="0">return zero, false</span>
+        default:<span class="cov0" title="0">
+                _ = target
+                return zero, false</span>
+        }
+}
+
+func convertToInt64(val any) (int64, bool) <span class="cov0" title="0">{
+        switch v := val.(type) </span>{
+        case int64:<span class="cov0" title="0">
+                return v, true</span>
+        case int:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case int32:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case int16:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case int8:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case uint64:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case uint32:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case uint16:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case uint8:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case float64:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case float32:<span class="cov0" title="0">
+                return int64(v), true</span>
+        case string:<span class="cov0" title="0">
+                // Could add string parsing here
+                return 0, false</span>
+        default:<span class="cov0" title="0">
+                return 0, false</span>
+        }
+}
+
+func convertToFloat64(val any) (float64, bool) <span class="cov0" title="0">{
+        switch v := val.(type) </span>{
+        case float64:<span class="cov0" title="0">
+                return v, true</span>
+        case float32:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case int64:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case int:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case int32:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case int16:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case int8:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case uint64:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case uint32:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case uint16:<span class="cov0" title="0">
+                return float64(v), true</span>
+        case uint8:<span class="cov0" title="0">
+                return float64(v), true</span>
+        default:<span class="cov0" title="0">
+                return 0, false</span>
+        }
+}
+
+func convertToString(val any) (string, bool) <span class="cov0" title="0">{
+        switch v := val.(type) </span>{
+        case string:<span class="cov0" title="0">
+                return v, true</span>
+        case []byte:<span class="cov0" title="0">
+                return string(v), true</span>
+        default:<span class="cov0" title="0">
+                return fmt.Sprintf("%v", val), true</span>
+        }
+}
+
+func convertToBool(val any) (bool, bool) <span class="cov0" title="0">{
+        switch v := val.(type) </span>{
+        case bool:<span class="cov0" title="0">
+                return v, true</span>
+        case int64:<span class="cov0" title="0">
+                return v != 0, true</span>
+        case int:<span class="cov0" title="0">
+                return v != 0, true</span>
+        case float64:<span class="cov0" title="0">
+                return v != 0, true</span>
+        case string:<span class="cov0" title="0">
+                return v != "", true</span>
+        default:<span class="cov0" title="0">
+                return false, false</span>
+        }
+}
+
+func convertToTime(val any) (time.Time, bool) <span class="cov0" title="0">{
+        switch v := val.(type) </span>{
+        case time.Time:<span class="cov0" title="0">
+                return v, true</span>
+        case string:<span class="cov0" title="0">
+                if t, err := time.Parse(time.RFC3339, v); err == nil </span><span class="cov0" title="0">{
+                        return t, true
+                }</span>
+                <span class="cov0" title="0">if t, err := time.Parse("2006-01-02 15:04:05", v); err == nil </span><span class="cov0" title="0">{
+                        return t, true
+                }</span>
+                <span class="cov0" title="0">return time.Time{}, false</span>
+        case int64:<span class="cov0" title="0">
+                return time.Unix(v, 0), true</span>
+        default:<span class="cov0" title="0">
+                return time.Time{}, false</span>
+        }
+}
+
+// ============================================================================
+// STREAM CREATION - GENERICS MAKE THIS BEAUTIFUL
+// ============================================================================
+
+// FromSlice creates a stream from a slice of any type
+func FromSlice[T any](items []T) Stream[T] <span class="cov0" title="0">{
+        index := 0
+        return func() (T, error) </span><span class="cov0" title="0">{
+                if index &gt;= len(items) </span><span class="cov0" title="0">{
+                        var zero T
+                        return zero, EOS
+                }</span>
+                <span class="cov0" title="0">item := items[index]
+                index++
+                return item, nil</span>
+        }
+}
+
+// FromChannel creates a stream from a channel
+func FromChannel[T any](ch &lt;-chan T) Stream[T] <span class="cov0" title="0">{
+        return func() (T, error) </span><span class="cov0" title="0">{
+                item, ok := &lt;-ch
+                if !ok </span><span class="cov0" title="0">{
+                        var zero T
+                        return zero, EOS
+                }</span>
+                <span class="cov0" title="0">return item, nil</span>
+        }
+}
+
+// FromRecords creates a RecordStream from Records
+func FromRecords(records []Record) RecordStream <span class="cov0" title="0">{
+        return FromSlice(records)
+}</span>
+
+// FromMaps creates a RecordStream from maps
+func FromMaps(maps []map[string]any) RecordStream <span class="cov0" title="0">{
+        return FromSlice(RecordsFrom(maps))
+}</span>
+
+// Generate creates a stream using a generator function
+func Generate[T any](generator func() (T, error)) Stream[T] <span class="cov0" title="0">{
+        return generator
+}</span>
+
+// Range creates a numeric stream
+func Range(start, end, step int64) IntStream <span class="cov0" title="0">{
+        current := start
+        return func() (int64, error) </span><span class="cov0" title="0">{
+                if (step &gt; 0 &amp;&amp; current &gt;= end) || (step &lt; 0 &amp;&amp; current &lt;= end) </span><span class="cov0" title="0">{
+                        return 0, EOS
+                }</span>
+                <span class="cov0" title="0">value := current
+                current += step
+                return value, nil</span>
+        }
+}
+
+// ============================================================================
+// FUNCTIONAL OPERATIONS - TYPE SAFE AND COMPOSABLE
+// ============================================================================
+
+// Map transforms each element in a stream
+func Map[T, U any](fn func(T) U) Filter[T, U] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[U] </span><span class="cov0" title="0">{
+                return func() (U, error) </span><span class="cov0" title="0">{
+                        item, err := input()
+                        if err != nil </span><span class="cov0" title="0">{
+                                var zero U
+                                return zero, err
+                        }</span>
+                        <span class="cov0" title="0">return fn(item), nil</span>
+                }
+        }
+}
+
+// Filter keeps only elements matching a predicate
+func Where[T any](predicate func(T) bool) Filter[T, T] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[T] </span><span class="cov0" title="0">{
+                return func() (T, error) </span><span class="cov0" title="0">{
+                        for </span><span class="cov0" title="0">{
+                                item, err := input()
+                                if err != nil </span><span class="cov0" title="0">{
+                                        var zero T
+                                        return zero, err
+                                }</span>
+                                <span class="cov0" title="0">if predicate(item) </span><span class="cov0" title="0">{
+                                        return item, nil
+                                }</span>
+                        }
+                }
+        }
+}
+
+// Take limits stream to first N elements
+func Take[T any](n int) Filter[T, T] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[T] </span><span class="cov0" title="0">{
+                count := 0
+                return func() (T, error) </span><span class="cov0" title="0">{
+                        if count &gt;= n </span><span class="cov0" title="0">{
+                                var zero T
+                                return zero, EOS
+                        }</span>
+                        <span class="cov0" title="0">count++
+                        return input()</span>
+                }
+        }
+}
+
+// Skip skips first N elements
+func Skip[T any](n int) Filter[T, T] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[T] </span><span class="cov0" title="0">{
+                skipped := 0
+                return func() (T, error) </span><span class="cov0" title="0">{
+                        for skipped &lt; n </span><span class="cov0" title="0">{
+                                if _, err := input(); err != nil </span><span class="cov0" title="0">{
+                                        var zero T
+                                        return zero, err
+                                }</span>
+                                <span class="cov0" title="0">skipped++</span>
+                        }
+                        <span class="cov0" title="0">return input()</span>
+                }
+        }
+}
+
+// ============================================================================
+// STREAM COMPOSITION - BEAUTIFUL CHAINING
+// ============================================================================
+
+// Pipe composes two filters
+func Pipe[T, U, V any](f1 Filter[T, U], f2 Filter[U, V]) Filter[T, V] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[V] </span><span class="cov0" title="0">{
+                return f2(f1(input))
+        }</span>
+}
+
+// Pipe3 composes three filters
+func Pipe3[T, U, V, W any](f1 Filter[T, U], f2 Filter[U, V], f3 Filter[V, W]) Filter[T, W] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[W] </span><span class="cov0" title="0">{
+                return f3(f2(f1(input)))
+        }</span>
+}
+
+// Chain applies multiple filters of the same type
+func Chain[T any](filters ...Filter[T, T]) Filter[T, T] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[T] </span><span class="cov0" title="0">{
+                result := input
+                for _, filter := range filters </span><span class="cov0" title="0">{
+                        result = filter(result)
+                }</span>
+                <span class="cov0" title="0">return result</span>
+        }
+}
+
+// ============================================================================
+// RECORD-SPECIFIC OPERATIONS - SQL-LIKE POWER
+// ============================================================================
+
+// Select extracts specific fields from records
+func Select(fields ...string) Filter[Record, Record] <span class="cov0" title="0">{
+        return Map(func(r Record) Record </span><span class="cov0" title="0">{
+                result := make(Record)
+                for _, field := range fields </span><span class="cov0" title="0">{
+                        if val, exists := r[field]; exists </span><span class="cov0" title="0">{
+                                result[field] = val
+                        }</span>
+                }
+                <span class="cov0" title="0">return result</span>
+        })
+}
+
+// Update modifies records
+func Update(fn func(Record) Record) Filter[Record, Record] <span class="cov0" title="0">{
+        return Map(fn)
+}</span>
+
+// ExtractField gets a typed field from records
+func ExtractField[T any](field string) Filter[Record, T] <span class="cov0" title="0">{
+        return Map(func(r Record) T </span><span class="cov0" title="0">{
+                val, _ := Get[T](r, field)
+                return val
+        }</span>)
+}
+
+// ============================================================================
+// AGGREGATION FUNCTIONS - TYPE SAFE
+// ============================================================================
+
+// Sum aggregates numeric values
+func Sum[T Numeric](stream Stream[T]) (T, error) <span class="cov0" title="0">{
+        var total T
+        for </span><span class="cov0" title="0">{
+                val, err := stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                return total, nil
+                        }</span>
+                        <span class="cov0" title="0">return total, err</span>
+                }
+                <span class="cov0" title="0">total += val</span>
+        }
+}
+
+// Count counts elements
+func Count[T any](stream Stream[T]) (int64, error) <span class="cov0" title="0">{
+        var count int64
+        for </span><span class="cov0" title="0">{
+                _, err := stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                return count, nil
+                        }</span>
+                        <span class="cov0" title="0">return count, err</span>
+                }
+                <span class="cov0" title="0">count++</span>
+        }
+}
+
+// Max finds maximum value
+func Max[T Comparable](stream Stream[T]) (T, error) <span class="cov0" title="0">{
+        var max T
+        first := true
+
+        for </span><span class="cov0" title="0">{
+                val, err := stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                if first </span><span class="cov0" title="0">{
+                                        return max, errors.New("empty stream")
+                                }</span>
+                                <span class="cov0" title="0">return max, nil</span>
+                        }
+                        <span class="cov0" title="0">return max, err</span>
+                }
+
+                <span class="cov0" title="0">if first || val &gt; max </span><span class="cov0" title="0">{
+                        max = val
+                        first = false
+                }</span>
+        }
+}
+
+// Min finds minimum value
+func Min[T Comparable](stream Stream[T]) (T, error) <span class="cov0" title="0">{
+        var min T
+        first := true
+
+        for </span><span class="cov0" title="0">{
+                val, err := stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                if first </span><span class="cov0" title="0">{
+                                        return min, errors.New("empty stream")
+                                }</span>
+                                <span class="cov0" title="0">return min, nil</span>
+                        }
+                        <span class="cov0" title="0">return min, err</span>
+                }
+
+                <span class="cov0" title="0">if first || val &lt; min </span><span class="cov0" title="0">{
+                        min = val
+                        first = false
+                }</span>
+        }
+}
+
+// Collect gathers all stream elements into a slice
+func Collect[T any](stream Stream[T]) ([]T, error) <span class="cov0" title="0">{
+        var result []T
+        for </span><span class="cov0" title="0">{
+                item, err := stream()
+                if err != nil </span><span class="cov0" title="0">{
+                        if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                return result, nil
+                        }</span>
+                        <span class="cov0" title="0">return result, err</span>
+                }
+                <span class="cov0" title="0">result = append(result, item)</span>
+        }
+}
+
+// ForEach executes a function for each element
+func ForEach[T any](fn func(T)) func(Stream[T]) error <span class="cov0" title="0">{
+        return func(stream Stream[T]) error </span><span class="cov0" title="0">{
+                for </span><span class="cov0" title="0">{
+                        item, err := stream()
+                        if err != nil </span><span class="cov0" title="0">{
+                                if errors.Is(err, EOS) </span><span class="cov0" title="0">{
+                                        return nil
+                                }</span>
+                                <span class="cov0" title="0">return err</span>
+                        }
+                        <span class="cov0" title="0">fn(item)</span>
+                }
+        }
+}
+
+// ============================================================================
+// TYPE CONSTRAINTS
+// ============================================================================
+
+// Numeric constraint for mathematical operations
+type Numeric interface {
+        ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+                ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+                ~float32 | ~float64
+}
+
+// Comparable constraint for ordering operations
+type Comparable interface {
+        ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+                ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+                ~float32 | ~float64 | ~string
+}
+
+// ============================================================================
+// CONCURRENT PROCESSING
+// ============================================================================
+
+// Parallel processes elements concurrently
+func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] <span class="cov0" title="0">{
+        return func(input Stream[T]) Stream[U] </span><span class="cov0" title="0">{
+                inputCh := make(chan T, workers)
+                outputCh := make(chan U, workers)
+
+                // Start workers
+                for i := 0; i &lt; workers; i++ </span><span class="cov0" title="0">{
+                        go func() </span><span class="cov0" title="0">{
+                                for item := range inputCh </span><span class="cov0" title="0">{
+                                        outputCh &lt;- fn(item)
+                                }</span>
+                        }()
+                }
+
+                // Feed input
+                <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                        defer close(inputCh)
+                        defer func() </span><span class="cov0" title="0">{
+                                // Give workers time to finish, then close output
+                                go func() </span><span class="cov0" title="0">{
+                                        time.Sleep(100 * time.Millisecond)
+                                        close(outputCh)
+                                }</span>()
+                        }()
+
+                        <span class="cov0" title="0">for </span><span class="cov0" title="0">{
+                                item, err := input()
+                                if err != nil </span><span class="cov0" title="0">{
+                                        return
+                                }</span>
+                                <span class="cov0" title="0">inputCh &lt;- item</span>
+                        }
+                }()
+
+                <span class="cov0" title="0">return FromChannel(outputCh)</span>
+        }
+}
+
+// ============================================================================
+// CONTEXT SUPPORT
+// ============================================================================
+
+// WithContext adds context support to a stream
+func WithContext[T any](ctx context.Context, stream Stream[T]) Stream[T] <span class="cov0" title="0">{
+        return func() (T, error) </span><span class="cov0" title="0">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov0" title="0">
+                        var zero T
+                        return zero, ctx.Err()</span>
+                default:<span class="cov0" title="0">
+                        return stream()</span>
+                }
+        }
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

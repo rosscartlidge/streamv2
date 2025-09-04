@@ -16,13 +16,13 @@ type Processor interface {
 	PortScanDetection(timeWindow time.Duration, threshold int) func([]NetFlow) []PortScanAlert
 	DDoSDetection(baseline, threshold float64) func([]NetFlow) []DDoSAlert
 	TrafficMatrix() func([]NetFlow) TrafficMatrix
-	
-	// Statistical operations  
+
+	// Statistical operations
 	StatsInt64(percentiles []float64) func([]int64) StatsSummary
 	StatsFloat64(percentiles []float64) func([]float64) StatsSummary
 	HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64
 	HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64
-	
+
 	// System info
 	Capabilities() ProcessorInfo
 	Metrics() ProcessorMetrics
@@ -76,12 +76,12 @@ func NewProcessor(opts ...ProcessorOption) Processor {
 		BatchSize:     100000,
 		MemoryLimit:   1024 * 1024 * 1024, // 1GB default
 	}
-	
+
 	// Apply options
 	for _, opt := range opts {
 		opt(config)
 	}
-	
+
 	// Try GPU first if preferred
 	if config.PreferGPU {
 		if gpu, err := newGPUProcessor(config); err == nil {
@@ -92,12 +92,12 @@ func NewProcessor(opts ...ProcessorOption) Processor {
 			}
 		}
 	}
-	
+
 	// Fallback to CPU or fail
 	if config.FallbackToCPU {
 		return newCPUProcessor(config)
 	}
-	
+
 	panic("No suitable processor available")
 }
 
@@ -192,7 +192,7 @@ func Batched[T, U any](batchSize int, processor func([]T) []U) Filter[T, U] {
 		var batch []T
 		var results []U
 		var resultIndex int
-		
+
 		return func() (U, error) {
 			// Return cached results first
 			if resultIndex < len(results) {
@@ -200,7 +200,7 @@ func Batched[T, U any](batchSize int, processor func([]T) []U) Filter[T, U] {
 				resultIndex++
 				return result, nil
 			}
-			
+
 			// Collect new batch
 			batch = batch[:0] // Reset slice but keep capacity
 			for len(batch) < batchSize {
@@ -214,23 +214,23 @@ func Batched[T, U any](batchSize int, processor func([]T) []U) Filter[T, U] {
 				}
 				batch = append(batch, item)
 			}
-			
+
 			if len(batch) == 0 {
 				var zero U
 				return zero, EOS
 			}
-			
+
 			// Process batch
 			results = processor(batch)
 			resultIndex = 0
-			
+
 			// Return first result
 			if len(results) > 0 {
 				result := results[0]
 				resultIndex = 1
 				return result, nil
 			}
-			
+
 			// Empty results, try again
 			var zero U
 			return zero, EOS
@@ -245,7 +245,7 @@ func Batched[T, U any](batchSize int, processor func([]T) []U) Filter[T, U] {
 // Placeholder processor types
 type adaptiveProcessor struct {
 	cpu    *cpuProcessor
-	gpu    *gpuProcessor  
+	gpu    *gpuProcessor
 	config *ProcessorConfig
 }
 
@@ -328,7 +328,7 @@ func (cpu *cpuProcessor) TopTalkers(topN int) func([]NetFlow) []TopTalker {
 			talkers[flow.SrcIP] += flow.Bytes
 			talkers[flow.DstIP] += flow.Bytes
 		}
-		
+
 		// Convert to slice and return top N (simplified)
 		var result []TopTalker
 		for ip, bytes := range talkers {
@@ -350,7 +350,7 @@ func (cpu *cpuProcessor) PortScanDetection(timeWindow time.Duration, threshold i
 
 func (cpu *cpuProcessor) DDoSDetection(baseline, threshold float64) func([]NetFlow) []DDoSAlert {
 	return func(flows []NetFlow) []DDoSAlert {
-		// Placeholder implementation  
+		// Placeholder implementation
 		return []DDoSAlert{}
 	}
 }

@@ -11,8 +11,8 @@ import (
 // StreamValue wraps a stream to be stored in records
 type StreamValue[T any] struct {
 	stream Stream[T]
-	cached []T      // Cache for multiple iterations
-	index  int      // Current position in cache
+	cached []T // Cache for multiple iterations
+	index  int // Current position in cache
 }
 
 // NewStreamValue creates a StreamValue from a stream
@@ -52,7 +52,7 @@ func (sv *StreamValue[T]) Cache() error {
 	if sv.cached != nil {
 		return nil // Already cached
 	}
-	
+
 	var items []T
 	for {
 		item, err := sv.stream()
@@ -64,7 +64,7 @@ func (sv *StreamValue[T]) Cache() error {
 		}
 		items = append(items, item)
 	}
-	
+
 	sv.cached = items
 	sv.index = 0
 	return nil
@@ -88,22 +88,22 @@ func GetStream[T any](r Record, field string) (Stream[T], bool) {
 	if !exists {
 		return nil, false
 	}
-	
+
 	// Check if it's a StreamValue
 	if sv, ok := val.(*StreamValue[T]); ok {
 		return sv.Stream(), true
 	}
-	
+
 	// Check if it's a direct stream
 	if stream, ok := val.(Stream[T]); ok {
 		return stream, true
 	}
-	
+
 	// Check if it's a slice that can be converted to stream
 	if slice, ok := val.([]T); ok {
 		return FromSlice(slice), true
 	}
-	
+
 	return nil, false
 }
 
@@ -128,12 +128,12 @@ func RWithStreams(pairs ...any) Record {
 	if len(pairs)%2 != 0 {
 		panic("RWithStreams() requires even number of arguments")
 	}
-	
+
 	r := make(Record)
 	for i := 0; i < len(pairs); i += 2 {
 		key := pairs[i].(string)
 		value := pairs[i+1]
-		
+
 		// Wrap streams automatically
 		if stream, ok := value.(Stream[any]); ok {
 			r[key] = NewStreamValue(stream)
@@ -152,7 +152,7 @@ func RWithStreams(pairs ...any) Record {
 func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
 		var currentSubStream Stream[U]
-		
+
 		return func() (U, error) {
 			for {
 				// Try to get from current sub-stream
@@ -168,14 +168,14 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 					// Current sub-stream is exhausted
 					currentSubStream = nil
 				}
-				
+
 				// Get next item from main stream
 				item, err := input()
 				if err != nil {
 					var zero U
 					return zero, err
 				}
-				
+
 				// Create new sub-stream
 				currentSubStream = fn(item)
 			}
@@ -183,74 +183,93 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 	}
 }
 
-// ExpandStreams expands stream fields in records
+// ExpandStreams expands stream fields in records  
 func ExpandStreams(streamFields ...string) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
-		var currentRecord Record
-		var expandedStreams map[string]Stream[any]
-		var exhausted map[string]bool
+		// Collect all records first for easier processing
+		records, err := Collect(input)
+		if err != nil {
+			return func() (Record, error) { return nil, err }
+		}
+
+		var expandedRecords []Record
 		
-		return func() (Record, error) {
-			for {
-				// Initialize if needed
-				if currentRecord == nil {
-					record, err := input()
-					if err != nil {
-						return nil, err
+		// Process each record
+		for _, record := range records {
+			// Extract stream values for the specified fields
+			streamValues := make(map[string][]any)
+			baseRecord := make(Record)
+			maxLength := 0
+
+			// Process each field in the record
+			for k, v := range record {
+				isStreamField := false
+				for _, sf := range streamFields {
+					if k == sf {
+						isStreamField = true
+						break
+					}
+				}
+
+				if isStreamField {
+					// Extract values from this stream field
+					var values []any
+					if sv, ok := v.(*StreamValue[int64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[string]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[float64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[any]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, val)
+						}
 					}
 					
-					currentRecord = make(Record)
-					expandedStreams = make(map[string]Stream[any])
-					exhausted = make(map[string]bool)
-					
-					// Copy non-stream fields
-					for k, v := range record {
-						found := false
-						for _, sf := range streamFields {
-							if k == sf {
-								if stream, ok := GetStream[any](record, k); ok {
-									expandedStreams[k] = stream
-									found = true
-									break
-								}
-							}
-						}
-						if !found {
-							currentRecord[k] = v
+					if len(values) > 0 {
+						streamValues[k] = values
+						if len(values) > maxLength {
+							maxLength = len(values)
 						}
 					}
+				} else {
+					// Regular field - copy to base record
+					baseRecord[k] = v
+				}
+			}
+
+			// Generate expanded records by iterating through stream values
+			for i := 0; i < maxLength; i++ {
+				expandedRecord := make(Record)
+				
+				// Copy base fields
+				for k, v := range baseRecord {
+					expandedRecord[k] = v
 				}
 				
-				// Try to get next values from expanded streams
-				allExhausted := true
-				for field, stream := range expandedStreams {
-					if !exhausted[field] {
-						val, err := stream()
-						if err == EOS {
-							exhausted[field] = true
-						} else if err != nil {
-							return nil, err
-						} else {
-							currentRecord[field] = val
-							allExhausted = false
-						}
+				// Add stream values at current index
+				for field, values := range streamValues {
+					if i < len(values) {
+						expandedRecord[field] = values[i]
 					}
+					// Note: if stream is shorter, field is omitted from this record
 				}
 				
-				if allExhausted {
-					// Move to next record
-					currentRecord = nil
-					continue
-				}
-				
-				// Return current expanded record
-				result := make(Record)
-				for k, v := range currentRecord {
-					result[k] = v
-				}
-				return result, nil
+				expandedRecords = append(expandedRecords, expandedRecord)
 			}
 		}
+
+		return FromSlice(expandedRecords)
 	}
 }
 
@@ -263,17 +282,17 @@ func CreateNestedRecord() Record {
 	// Create some sample streams
 	numbersStream := FromSlice([]int64{1, 2, 3, 4, 5})
 	stringsStream := FromSlice([]string{"a", "b", "c"})
-	
+
 	// Create record with nested streams
 	record := R(
 		"id", 123,
 		"name", "example",
 	)
-	
+
 	// Add streams to record
 	SetTypedStream(record, "numbers", numbersStream)
 	SetTypedStream(record, "letters", stringsStream)
-	
+
 	return record
 }
 
@@ -285,7 +304,7 @@ func ProcessNestedStreams(record Record) {
 		sum, _ := Sum(numbersStream)
 		fmt.Printf("Sum of nested numbers: %d\n", sum)
 	}
-	
+
 	if lettersStream, ok := GetStream[string](record, "letters"); ok {
 		// Collect nested stream
 		letters, _ := Collect(lettersStream)
@@ -301,7 +320,7 @@ func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] {
 		if err != nil {
 			return func() (Record, error) { return nil, err }
 		}
-		
+
 		// Group records
 		groups := make(map[string][]Record)
 		for _, record := range records {
@@ -313,12 +332,12 @@ func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] {
 			}
 			groups[key] = append(groups[key], record)
 		}
-		
+
 		// Create results with grouped data as streams
 		var results []Record
 		for _, groupRecords := range groups {
 			result := make(Record)
-			
+
 			// Add key fields from first record
 			if len(groupRecords) > 0 {
 				for _, field := range keyFields {
@@ -327,14 +346,14 @@ func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] {
 					}
 				}
 			}
-			
+
 			// Add grouped records as a stream
 			result["grouped_records"] = NewStreamValue(FromSlice(groupRecords))
 			result["group_count"] = len(groupRecords)
-			
+
 			results = append(results, result)
 		}
-		
+
 		return FromSlice(results)
 	}
 }
