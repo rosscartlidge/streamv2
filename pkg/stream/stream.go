@@ -640,7 +640,252 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 }
 
 // ============================================================================
-// MULTI-AGGREGATION SUPPORT
+// GENERALIZED AGGREGATION SUPPORT
+// ============================================================================
+
+// Aggregator defines a composable aggregation operation
+type Aggregator[T, A, R any] struct {
+	Initial    func() A           // Create initial accumulator
+	Accumulate func(A, T) A      // Process each element
+	Finalize   func(A) R         // Produce final result
+}
+
+// AggregateWith runs a single custom aggregator on a stream
+func AggregateWith[T, A, R any](stream Stream[T], agg Aggregator[T, A, R]) (R, error) {
+	acc := agg.Initial()
+	
+	for {
+		val, err := stream()
+		if err != nil {
+			if errors.Is(err, EOS) {
+				return agg.Finalize(acc), nil
+			}
+			var zero R
+			return zero, err
+		}
+		
+		acc = agg.Accumulate(acc, val)
+	}
+}
+
+// AggregateMultiple runs multiple aggregators in parallel using Tee
+func AggregateMultiple[T any, A1, A2, R1, R2 any](
+	stream Stream[T],
+	agg1 Aggregator[T, A1, R1],
+	agg2 Aggregator[T, A2, R2],
+) (R1, R2, error) {
+	streams := Tee(stream, 2)
+	
+	result1, err1 := AggregateWith(streams[0], agg1)
+	result2, err2 := AggregateWith(streams[1], agg2)
+	
+	if err1 != nil {
+		var zero1 R1
+		var zero2 R2
+		return zero1, zero2, err1
+	}
+	if err2 != nil {
+		var zero1 R1
+		var zero2 R2
+		return zero1, zero2, err2
+	}
+	
+	return result1, result2, nil
+}
+
+// AggregateTriple runs three aggregators in parallel
+func AggregateTriple[T any, A1, A2, A3, R1, R2, R3 any](
+	stream Stream[T],
+	agg1 Aggregator[T, A1, R1],
+	agg2 Aggregator[T, A2, R2],
+	agg3 Aggregator[T, A3, R3],
+) (R1, R2, R3, error) {
+	streams := Tee(stream, 3)
+	
+	result1, err1 := AggregateWith(streams[0], agg1)
+	result2, err2 := AggregateWith(streams[1], agg2)
+	result3, err3 := AggregateWith(streams[2], agg3)
+	
+	if err1 != nil {
+		var zero1 R1
+		var zero2 R2
+		var zero3 R3
+		return zero1, zero2, zero3, err1
+	}
+	if err2 != nil {
+		var zero1 R1
+		var zero2 R2
+		var zero3 R3
+		return zero1, zero2, zero3, err2
+	}
+	if err3 != nil {
+		var zero1 R1
+		var zero2 R2
+		var zero3 R3
+		return zero1, zero2, zero3, err3
+	}
+	
+	return result1, result2, result3, nil
+}
+
+// ============================================================================
+// BUILT-IN AGGREGATORS
+// ============================================================================
+
+// SumAgg creates a sum aggregator
+func SumAgg[T Numeric]() Aggregator[T, T, T] {
+	return Aggregator[T, T, T]{
+		Initial:    func() T { var zero T; return zero },
+		Accumulate: func(acc T, val T) T { return acc + val },
+		Finalize:   func(acc T) T { return acc },
+	}
+}
+
+// CountAgg creates a count aggregator  
+func CountAgg[T any]() Aggregator[T, int64, int64] {
+	return Aggregator[T, int64, int64]{
+		Initial:    func() int64 { return 0 },
+		Accumulate: func(acc int64, val T) int64 { return acc + 1 },
+		Finalize:   func(acc int64) int64 { return acc },
+	}
+}
+
+// MinAgg creates a min aggregator
+func MinAgg[T Comparable]() Aggregator[T, *T, T] {
+	return Aggregator[T, *T, T]{
+		Initial: func() *T { return nil },
+		Accumulate: func(acc *T, val T) *T {
+			if acc == nil || val < *acc {
+				return &val
+			}
+			return acc
+		},
+		Finalize: func(acc *T) T {
+			if acc == nil {
+				var zero T
+				return zero
+			}
+			return *acc
+		},
+	}
+}
+
+// MaxAgg creates a max aggregator
+func MaxAgg[T Comparable]() Aggregator[T, *T, T] {
+	return Aggregator[T, *T, T]{
+		Initial: func() *T { return nil },
+		Accumulate: func(acc *T, val T) *T {
+			if acc == nil || val > *acc {
+				return &val
+			}
+			return acc
+		},
+		Finalize: func(acc *T) T {
+			if acc == nil {
+				var zero T
+				return zero
+			}
+			return *acc
+		},
+	}
+}
+
+// AvgAgg creates an average aggregator
+func AvgAgg[T Numeric]() Aggregator[T, [2]float64, float64] {
+	return Aggregator[T, [2]float64, float64]{
+		Initial: func() [2]float64 { return [2]float64{0, 0} }, // [sum, count]
+		Accumulate: func(acc [2]float64, val T) [2]float64 {
+			return [2]float64{acc[0] + float64(val), acc[1] + 1}
+		},
+		Finalize: func(acc [2]float64) float64 {
+			if acc[1] == 0 {
+				return 0
+			}
+			return acc[0] / acc[1]
+		},
+	}
+}
+
+// ============================================================================
+// GENERALIZED AGGREGATES FUNCTION
+// ============================================================================
+
+// AggregatorSpec represents a named aggregator specification
+type AggregatorSpec[T any] struct {
+	Name string
+	Agg  interface{} // Type-erased aggregator
+}
+
+// Aggregates runs multiple named aggregators and returns results in a Record
+func Aggregates[T any](stream Stream[T], specs ...AggregatorSpec[T]) (Record, error) {
+	if len(specs) == 0 {
+		return Record{}, nil
+	}
+
+	// Split stream into multiple streams using Tee
+	streams := Tee(stream, len(specs))
+	
+	// Create result record
+	result := Record{}
+	
+	// Run each aggregator on its own stream
+	for i, spec := range specs {
+		var err error
+		var value interface{}
+		
+		// Type-assert the aggregator and run it
+		switch agg := spec.Agg.(type) {
+		case Aggregator[T, T, T]:
+			value, err = AggregateWith(streams[i], agg)
+		case Aggregator[T, int64, int64]:
+			value, err = AggregateWith(streams[i], agg)
+		case Aggregator[T, *T, T]:
+			value, err = AggregateWith(streams[i], agg)
+		case Aggregator[T, [2]float64, float64]:
+			value, err = AggregateWith(streams[i], agg)
+		default:
+			// For custom aggregators, try to use reflection or provide a generic interface
+			return result, fmt.Errorf("unsupported aggregator type for '%s'", spec.Name)
+		}
+		
+		if err != nil {
+			return result, err
+		}
+		
+		result[spec.Name] = value
+	}
+	
+	return result, nil
+}
+
+// Helper functions to create aggregator specs
+func SumSpec[T Numeric](name string) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: SumAgg[T]()}
+}
+
+func CountSpec[T any](name string) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: CountAgg[T]()}
+}
+
+func MinSpec[T Comparable](name string) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: MinAgg[T]()}
+}
+
+func MaxSpec[T Comparable](name string) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: MaxAgg[T]()}
+}
+
+func AvgSpec[T Numeric](name string) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: AvgAgg[T]()}
+}
+
+// CustomSpec creates a spec for any custom aggregator
+func CustomSpec[T, A, R any](name string, agg Aggregator[T, A, R]) AggregatorSpec[T] {
+	return AggregatorSpec[T]{Name: name, Agg: agg}
+}
+
+// ============================================================================
+// SIMPLIFIED MULTI-AGGREGATION (keeping for backward compatibility)
 // ============================================================================
 
 // Stats holds multiple aggregation results computed in a single pass

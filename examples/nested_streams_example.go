@@ -164,21 +164,28 @@ func demonstrateGroupingWithStreams() {
 
 		// Extract grouped records stream
 		if groupStream, ok := stream.GetStream[stream.Record](group, "grouped_records"); ok {
-			// Process each person in the group
-			people, _ := stream.Collect(groupStream)
+			// Use Tee to split the stream so we can both list people and compute stats
+			streams := stream.Tee(groupStream, 2)
+			
+			// Process each person in the group (using first stream)
+			people, _ := stream.Collect(streams[0])
 			for _, person := range people {
 				fmt.Printf("  - %s (score: %v)\n", person["name"], person["score"])
 			}
 
-			// Calculate department statistics using multi-aggregation from the stream
-			if groupStream2, ok := stream.GetStream[stream.Record](group, "grouped_records"); ok {
-				// Extract scores and compute multiple statistics in one pass
-				scoreStream := stream.ExtractField[int]("score")(groupStream2)
-				stats, err := stream.MultiAggregate(scoreStream)
-				if err == nil && stats.Count > 0 {
-					fmt.Printf("  Average score: %.1f (min=%d, max=%d)\n", 
-						stats.Avg, stats.Min, stats.Max)
-				}
+			// Calculate department statistics using composable aggregators (using second stream)
+			scoreStream := stream.ExtractField[int]("score")(streams[1])
+			
+			// Use composable aggregators to get average, min, max in one pass
+			avg, min, max, err := stream.AggregateTriple(
+				scoreStream,
+				stream.AvgAgg[int](),
+				stream.MinAgg[int](),
+				stream.MaxAgg[int](),
+			)
+			
+			if err == nil {
+				fmt.Printf("  Average score: %.1f (min=%d, max=%d)\n", avg, min, max)
 			}
 		}
 	}
