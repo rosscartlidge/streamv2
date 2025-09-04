@@ -148,6 +148,40 @@ func RWithStreams(pairs ...any) Record {
 // NESTED STREAM OPERATIONS
 // ============================================================================
 
+// detectStreamFields automatically finds all fields that contain streams
+func detectStreamFields(record Record) []string {
+	var streamFields []string
+	
+	for fieldName, value := range record {
+		// Check if this field contains a StreamValue of any type
+		isStream := false
+		
+		// Check common StreamValue types
+		if _, ok := value.(*StreamValue[int64]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[string]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[float64]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[any]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[int]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[uint64]); ok {
+			isStream = true
+		} else if _, ok := value.(*StreamValue[bool]); ok {
+			isStream = true
+		}
+		// Add more types as needed
+		
+		if isStream {
+			streamFields = append(streamFields, fieldName)
+		}
+	}
+	
+	return streamFields
+}
+
 // FlatMap flattens nested streams (stream of streams → single stream)
 func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
@@ -185,6 +219,7 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 
 // ExpandStreamsDot expands stream fields using dot product (element-wise pairing)
 // For streams of different lengths, shorter streams are exhausted first
+// If no streamFields are specified, all stream fields in the record are expanded
 func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
 		// Collect all records first for easier processing
@@ -197,6 +232,33 @@ func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 		
 		// Process each record
 		for _, record := range records {
+			// Auto-detect stream fields if none specified
+			fieldsToExpand := streamFields
+			if len(fieldsToExpand) == 0 {
+				fieldsToExpand = detectStreamFields(record)
+			}
+			
+			// Cache all stream values first to ensure multiple access
+			for _, fieldName := range fieldsToExpand {
+				if val, exists := record[fieldName]; exists {
+					if sv, ok := val.(*StreamValue[int64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[string]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[float64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[any]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[int]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[uint64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[bool]); ok {
+						sv.Cache()
+					}
+				}
+			}
+			
 			// Extract stream values for the specified fields
 			streamValues := make(map[string][]any)
 			baseRecord := make(Record)
@@ -205,7 +267,7 @@ func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 			// Process each field in the record
 			for k, v := range record {
 				isStreamField := false
-				for _, sf := range streamFields {
+				for _, sf := range fieldsToExpand {
 					if k == sf {
 						isStreamField = true
 						break
@@ -234,6 +296,21 @@ func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 						vals, _ := Collect(sv.Stream())
 						for _, val := range vals {
 							values = append(values, val)
+						}
+					} else if sv, ok := v.(*StreamValue[int]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[uint64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[bool]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
 						}
 					}
 					
@@ -276,6 +353,7 @@ func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 
 // ExpandStreamsCross expands stream fields using cross product (Cartesian product)
 // Every value from each stream is combined with every value from other streams
+// If no streamFields are specified, all stream fields in the record are expanded
 func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
 		// Collect all records first for easier processing
@@ -288,6 +366,33 @@ func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
 		
 		// Process each record
 		for _, record := range records {
+			// Auto-detect stream fields if none specified
+			fieldsToExpand := streamFields
+			if len(fieldsToExpand) == 0 {
+				fieldsToExpand = detectStreamFields(record)
+			}
+			
+			// Cache all stream values first to ensure multiple access
+			for _, fieldName := range fieldsToExpand {
+				if val, exists := record[fieldName]; exists {
+					if sv, ok := val.(*StreamValue[int64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[string]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[float64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[any]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[int]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[uint64]); ok {
+						sv.Cache()
+					} else if sv, ok := val.(*StreamValue[bool]); ok {
+						sv.Cache()
+					}
+				}
+			}
+			
 			// Extract stream values for the specified fields
 			streamValues := make(map[string][]any)
 			baseRecord := make(Record)
@@ -295,7 +400,7 @@ func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
 			// Process each field in the record
 			for k, v := range record {
 				isStreamField := false
-				for _, sf := range streamFields {
+				for _, sf := range fieldsToExpand {
 					if k == sf {
 						isStreamField = true
 						break
@@ -325,6 +430,21 @@ func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
 						for _, val := range vals {
 							values = append(values, val)
 						}
+					} else if sv, ok := v.(*StreamValue[int]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[uint64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[bool]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
 					}
 					
 					if len(values) > 0 {
@@ -337,7 +457,7 @@ func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
 			}
 
 			// Generate all combinations using recursive cross product
-			combinations := generateCrossProduct(streamFields, streamValues)
+			combinations := generateCrossProduct(fieldsToExpand, streamValues)
 			
 			// Create expanded records for each combination
 			for _, combo := range combinations {

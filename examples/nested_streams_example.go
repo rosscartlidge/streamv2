@@ -109,6 +109,28 @@ func demonstrateStreamExpansion() {
 	
 	fmt.Println("\nCross Product Expansion (Cartesian product):")
 	printRecords(expandedRecordsCross)
+	
+	// Demonstrate auto-detection (no field arguments)
+	fmt.Println("\nAuto-Detection Expansion (finds all stream fields automatically):")
+	recordWithMixedStreams := stream.R("name", "auto_test", "category", "demo")
+	stream.SetTypedStream(recordWithMixedStreams, "values", stream.FromSlice([]int64{10, 20}))
+	stream.SetTypedStream(recordWithMixedStreams, "tags", stream.FromSlice([]string{"fast", "reliable"}))
+	stream.SetTypedStream(recordWithMixedStreams, "scores", stream.FromSlice([]float64{98.5, 87.3}))
+	
+	autoStream := stream.FromRecords([]stream.Record{recordWithMixedStreams})
+	autoExpanded := stream.ExpandStreamsCross()(autoStream) // No arguments - auto-detects all streams!
+	
+	autoResults, _ := stream.Collect(autoExpanded)
+	fmt.Printf("Auto-detected %d stream fields, generated %d combinations:\n", 3, len(autoResults))
+	for i, r := range autoResults {
+		fmt.Printf("  %d: %v\n", i+1, r)
+		if i >= 7 { // Show first 8
+			if len(autoResults) > 8 {
+				fmt.Printf("  ... (%d more combinations)\n", len(autoResults)-8)
+			}
+			break
+		}
+	}
 }
 
 // ============================================================================
