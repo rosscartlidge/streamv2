@@ -640,6 +640,111 @@ func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 }
 
 // ============================================================================
+// MULTI-AGGREGATION SUPPORT
+// ============================================================================
+
+// Stats holds multiple aggregation results computed in a single pass
+type Stats[T Numeric] struct {
+	Count int64
+	Sum   T
+	Min   T
+	Max   T
+	Avg   float64
+}
+
+// MultiAggregate computes multiple statistics in a single pass through the stream
+func MultiAggregate[T Numeric](stream Stream[T]) (Stats[T], error) {
+	var stats Stats[T]
+	first := true
+	
+	for {
+		val, err := stream()
+		if err != nil {
+			if errors.Is(err, EOS) {
+				if stats.Count > 0 {
+					stats.Avg = float64(stats.Sum) / float64(stats.Count)
+				}
+				return stats, nil
+			}
+			return stats, err
+		}
+		
+		stats.Count++
+		stats.Sum += val
+		
+		if first {
+			stats.Min = val
+			stats.Max = val
+			first = false
+		} else {
+			if val < stats.Min {
+				stats.Min = val
+			}
+			if val > stats.Max {
+				stats.Max = val
+			}
+		}
+	}
+}
+
+// SumAndCount computes both sum and count in a single pass
+func SumAndCount[T Numeric](stream Stream[T]) (sum T, count int64, err error) {
+	var zero T
+	for {
+		val, streamErr := stream()
+		if streamErr != nil {
+			if errors.Is(streamErr, EOS) {
+				return sum, count, nil
+			}
+			return zero, 0, streamErr
+		}
+		sum += val
+		count++
+	}
+}
+
+// Average computes the average in a single pass (combines sum and count)
+func Average[T Numeric](stream Stream[T]) (float64, error) {
+	sum, count, err := SumAndCount(stream)
+	if err != nil {
+		return 0, err
+	}
+	if count == 0 {
+		return 0, errors.New("empty stream")
+	}
+	return float64(sum) / float64(count), nil
+}
+
+// Tee splits a stream into multiple identical streams for parallel consumption
+func Tee[T any](stream Stream[T], n int) []Stream[T] {
+	if n <= 0 {
+		return nil
+	}
+	
+	// Collect all values first
+	values, err := Collect(stream)
+	if err != nil {
+		// Return n error streams
+		errorStreams := make([]Stream[T], n)
+		for i := range errorStreams {
+			errorStreams[i] = func() (T, error) {
+				var zero T
+				return zero, err
+			}
+		}
+		return errorStreams
+	}
+	
+	// Create n independent streams from the collected values
+	streams := make([]Stream[T], n)
+	for i := 0; i < n; i++ {
+		streams[i] = FromSlice(values) // Each stream gets its own copy
+	}
+	
+	return streams
+}
+
+// ============================================================================
 // CONTEXT SUPPORT
 // ============================================================================
 

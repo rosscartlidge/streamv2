@@ -170,27 +170,14 @@ func demonstrateGroupingWithStreams() {
 				fmt.Printf("  - %s (score: %v)\n", person["name"], person["score"])
 			}
 
-			// Calculate department statistics from collected people
-			if len(people) > 0 {
-				var totalScore int64
-				var validScores int
-				
-				for _, person := range people {
-					if scoreVal, exists := person["score"]; exists {
-						// Convert score to int64 regardless of original type
-						if score, ok := stream.Get[int64](person, "score"); ok {
-							totalScore += score
-							validScores++
-						} else if scoreInt, ok := scoreVal.(int); ok {
-							totalScore += int64(scoreInt)
-							validScores++
-						}
-					}
-				}
-				
-				if validScores > 0 {
-					avgScore := float64(totalScore) / float64(validScores)
-					fmt.Printf("  Average score: %.1f\n", avgScore)
+			// Calculate department statistics using multi-aggregation from the stream
+			if groupStream2, ok := stream.GetStream[stream.Record](group, "grouped_records"); ok {
+				// Extract scores and compute multiple statistics in one pass
+				scoreStream := stream.ExtractField[int]("score")(groupStream2)
+				stats, err := stream.MultiAggregate(scoreStream)
+				if err == nil && stats.Count > 0 {
+					fmt.Printf("  Average score: %.1f (min=%d, max=%d)\n", 
+						stats.Avg, stats.Min, stats.Max)
 				}
 			}
 		}
