@@ -316,7 +316,7 @@ func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] {
 		
 		// Create results with grouped data as streams
 		var results []Record
-		for groupKey, groupRecords := range groups {
+		for _, groupRecords := range groups {
 			result := make(Record)
 			
 			// Add key fields from first record

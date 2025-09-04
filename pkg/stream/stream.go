@@ -142,15 +142,30 @@ func convertTo[T any](val any) (T, bool) {
 	// Custom conversions for common cases
 	switch target := any(zero).(type) {
 	case int64:
-		return any(convertToInt64(val)).(T), true
+		if converted, ok := convertToInt64(val); ok {
+			return any(converted).(T), true
+		}
+		return zero, false
 	case float64:
-		return any(convertToFloat64(val)).(T), true
+		if converted, ok := convertToFloat64(val); ok {
+			return any(converted).(T), true
+		}
+		return zero, false
 	case string:
-		return any(convertToString(val)).(T), true
+		if converted, ok := convertToString(val); ok {
+			return any(converted).(T), true
+		}
+		return zero, false
 	case bool:
-		return any(convertToBool(val)).(T), true
+		if converted, ok := convertToBool(val); ok {
+			return any(converted).(T), true
+		}
+		return zero, false
 	case time.Time:
-		return any(convertToTime(val)).(T), true
+		if converted, ok := convertToTime(val); ok {
+			return any(converted).(T), true
+		}
+		return zero, false
 	default:
 		_ = target
 		return zero, false

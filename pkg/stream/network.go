@@ -217,7 +217,7 @@ func GroupByEndpoints() Filter[NetFlow, Record] {
 		
 		// Convert to records
 		var results []Record
-		for key, groupFlows := range groups {
+		for _, groupFlows := range groups {
 			if len(groupFlows) == 0 {
 				continue
 			}

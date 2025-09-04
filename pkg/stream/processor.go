@@ -18,8 +18,10 @@ type Processor interface {
 	TrafficMatrix() func([]NetFlow) TrafficMatrix
 	
 	// Statistical operations  
-	Stats[T Numeric](percentiles []float64) func([]T) StatsSummary
-	Histogram[T Numeric](buckets int) func([]T) []HistogramBucket[T]
+	StatsInt64(percentiles []float64) func([]int64) StatsSummary
+	StatsFloat64(percentiles []float64) func([]float64) StatsSummary
+	HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64
+	HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64
 	
 	// System info
 	Capabilities() ProcessorInfo
@@ -166,11 +168,18 @@ type StatsSummary struct {
 	Percentiles map[float64]float64 // Requested percentiles
 }
 
-// HistogramBucket represents a histogram bucket
-type HistogramBucket[T Numeric] struct {
-	Min   T     // Bucket minimum (inclusive)
-	Max   T     // Bucket maximum (exclusive)
+// HistogramBucketInt64 represents a histogram bucket for int64 values
+type HistogramBucketInt64 struct {
+	Min   int64 // Bucket minimum (inclusive)
+	Max   int64 // Bucket maximum (exclusive)
 	Count int64 // Number of values in bucket
+}
+
+// HistogramBucketFloat64 represents a histogram bucket for float64 values
+type HistogramBucketFloat64 struct {
+	Min   float64 // Bucket minimum (inclusive)
+	Max   float64 // Bucket maximum (exclusive)
+	Count int64   // Number of values in bucket
 }
 
 // ============================================================================
@@ -275,12 +284,20 @@ func (ap *adaptiveProcessor) TrafficMatrix() func([]NetFlow) TrafficMatrix {
 	return ap.cpu.TrafficMatrix()
 }
 
-func (ap *adaptiveProcessor) Stats[T Numeric](percentiles []float64) func([]T) StatsSummary {
-	return ap.cpu.Stats(percentiles)
+func (ap *adaptiveProcessor) StatsInt64(percentiles []float64) func([]int64) StatsSummary {
+	return ap.cpu.StatsInt64(percentiles)
 }
 
-func (ap *adaptiveProcessor) Histogram[T Numeric](buckets int) func([]T) []HistogramBucket[T] {
-	return ap.cpu.Histogram(buckets)
+func (ap *adaptiveProcessor) StatsFloat64(percentiles []float64) func([]float64) StatsSummary {
+	return ap.cpu.StatsFloat64(percentiles)
+}
+
+func (ap *adaptiveProcessor) HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64 {
+	return ap.cpu.HistogramInt64(buckets)
+}
+
+func (ap *adaptiveProcessor) HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64 {
+	return ap.cpu.HistogramFloat64(buckets)
 }
 
 func (ap *adaptiveProcessor) Capabilities() ProcessorInfo {
@@ -345,17 +362,31 @@ func (cpu *cpuProcessor) TrafficMatrix() func([]NetFlow) TrafficMatrix {
 	}
 }
 
-func (cpu *cpuProcessor) Stats[T Numeric](percentiles []float64) func([]T) StatsSummary {
-	return func(values []T) StatsSummary {
+func (cpu *cpuProcessor) StatsInt64(percentiles []float64) func([]int64) StatsSummary {
+	return func(values []int64) StatsSummary {
 		// Placeholder implementation
 		return StatsSummary{Count: int64(len(values))}
 	}
 }
 
-func (cpu *cpuProcessor) Histogram[T Numeric](buckets int) func([]T) []HistogramBucket[T] {
-	return func(values []T) []HistogramBucket[T] {
+func (cpu *cpuProcessor) StatsFloat64(percentiles []float64) func([]float64) StatsSummary {
+	return func(values []float64) StatsSummary {
 		// Placeholder implementation
-		return make([]HistogramBucket[T], buckets)
+		return StatsSummary{Count: int64(len(values))}
+	}
+}
+
+func (cpu *cpuProcessor) HistogramInt64(buckets int) func([]int64) []HistogramBucketInt64 {
+	return func(values []int64) []HistogramBucketInt64 {
+		// Placeholder implementation
+		return make([]HistogramBucketInt64, buckets)
+	}
+}
+
+func (cpu *cpuProcessor) HistogramFloat64(buckets int) func([]float64) []HistogramBucketFloat64 {
+	return func(values []float64) []HistogramBucketFloat64 {
+		// Placeholder implementation
+		return make([]HistogramBucketFloat64, buckets)
 	}
 }
 
