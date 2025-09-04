@@ -92,11 +92,23 @@ func demonstrateStreamExpansion() {
 		createRecordWithStreams("dataset2", []int64{300, 400, 500}, []string{"a", "b"}),
 	})
 
-	// Expand streams into individual records
-	expandedRecords := stream.ExpandStreams("numbers", "strings")(recordsWithStreams)
+	// Expand streams into individual records using dot product (element-wise)
+	expandedRecordsDot := stream.ExpandStreamsDot("numbers", "strings")(recordsWithStreams)
 
-	fmt.Println("\nExpanded records (streams → individual records):")
-	printRecords(expandedRecords)
+	fmt.Println("\nDot Product Expansion (element-wise pairing):")
+	printRecords(expandedRecordsDot)
+	
+	// Reset stream for cross product test
+	recordsWithStreams = stream.FromRecords([]stream.Record{
+		createRecordWithStreams("dataset1", []int64{100, 200}, []string{"x", "y", "z"}),
+		createRecordWithStreams("dataset2", []int64{300, 400, 500}, []string{"a", "b"}),
+	})
+	
+	// Expand streams using cross product (Cartesian product)
+	expandedRecordsCross := stream.ExpandStreamsCross("numbers", "strings")(recordsWithStreams)
+	
+	fmt.Println("\nCross Product Expansion (Cartesian product):")
+	printRecords(expandedRecordsCross)
 }
 
 // ============================================================================

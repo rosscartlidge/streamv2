@@ -183,8 +183,9 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 	}
 }
 
-// ExpandStreams expands stream fields in records  
-func ExpandStreams(streamFields ...string) Filter[Record, Record] {
+// ExpandStreamsDot expands stream fields using dot product (element-wise pairing)
+// For streams of different lengths, shorter streams are exhausted first
+func ExpandStreamsDot(streamFields ...string) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
 		// Collect all records first for easier processing
 		records, err := Collect(input)
@@ -271,6 +272,131 @@ func ExpandStreams(streamFields ...string) Filter[Record, Record] {
 
 		return FromSlice(expandedRecords)
 	}
+}
+
+// ExpandStreamsCross expands stream fields using cross product (Cartesian product)
+// Every value from each stream is combined with every value from other streams
+func ExpandStreamsCross(streamFields ...string) Filter[Record, Record] {
+	return func(input Stream[Record]) Stream[Record] {
+		// Collect all records first for easier processing
+		records, err := Collect(input)
+		if err != nil {
+			return func() (Record, error) { return nil, err }
+		}
+
+		var expandedRecords []Record
+		
+		// Process each record
+		for _, record := range records {
+			// Extract stream values for the specified fields
+			streamValues := make(map[string][]any)
+			baseRecord := make(Record)
+
+			// Process each field in the record
+			for k, v := range record {
+				isStreamField := false
+				for _, sf := range streamFields {
+					if k == sf {
+						isStreamField = true
+						break
+					}
+				}
+
+				if isStreamField {
+					// Extract values from this stream field
+					var values []any
+					if sv, ok := v.(*StreamValue[int64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[string]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[float64]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, any(val))
+						}
+					} else if sv, ok := v.(*StreamValue[any]); ok {
+						vals, _ := Collect(sv.Stream())
+						for _, val := range vals {
+							values = append(values, val)
+						}
+					}
+					
+					if len(values) > 0 {
+						streamValues[k] = values
+					}
+				} else {
+					// Regular field - copy to base record
+					baseRecord[k] = v
+				}
+			}
+
+			// Generate all combinations using recursive cross product
+			combinations := generateCrossProduct(streamFields, streamValues)
+			
+			// Create expanded records for each combination
+			for _, combo := range combinations {
+				expandedRecord := make(Record)
+				
+				// Copy base fields
+				for k, v := range baseRecord {
+					expandedRecord[k] = v
+				}
+				
+				// Add combination values
+				for field, value := range combo {
+					expandedRecord[field] = value
+				}
+				
+				expandedRecords = append(expandedRecords, expandedRecord)
+			}
+		}
+
+		return FromSlice(expandedRecords)
+	}
+}
+
+// generateCrossProduct creates all combinations of stream values
+func generateCrossProduct(fields []string, values map[string][]any) []map[string]any {
+	if len(fields) == 0 {
+		return []map[string]any{{}}
+	}
+	
+	field := fields[0]
+	fieldValues, exists := values[field]
+	if !exists || len(fieldValues) == 0 {
+		// If this field has no values, continue with remaining fields
+		return generateCrossProduct(fields[1:], values)
+	}
+	
+	// Get combinations for remaining fields
+	restCombinations := generateCrossProduct(fields[1:], values)
+	
+	var allCombinations []map[string]any
+	
+	// For each value in this field, combine with all rest combinations
+	for _, value := range fieldValues {
+		for _, restCombo := range restCombinations {
+			combo := make(map[string]any)
+			combo[field] = value
+			for k, v := range restCombo {
+				combo[k] = v
+			}
+			allCombinations = append(allCombinations, combo)
+		}
+	}
+	
+	return allCombinations
+}
+
+// ExpandStreams is an alias for ExpandStreamsDot for backward compatibility
+func ExpandStreams(streamFields ...string) Filter[Record, Record] {
+	return ExpandStreamsDot(streamFields...)
 }
 
 // ============================================================================
