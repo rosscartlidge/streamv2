@@ -8,7 +8,7 @@ import (
 )
 
 // ============================================================================
-// BASIC STREAMV2 EXAMPLE - SHOWCASE THE NEW API
+// BASIC STREAMV2 EXAMPLE - DEMONSTRATE CORE FUNCTIONALITY
 // ============================================================================
 
 func main() {
@@ -28,7 +28,7 @@ func demonstrateBasicOperations() {
 	fmt.Println("\n📊 Basic Stream Operations")
 	fmt.Println("--------------------------")
 
-	// Create a stream of numbers - no more wrapping!
+	// Create a stream of numbers using native Go types
 	numbers := stream.FromSlice([]int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
 	// Beautiful functional composition with full type safety
@@ -67,14 +67,14 @@ func demonstrateBasicOperations() {
 }
 
 // ============================================================================
-// RECORD PROCESSING - NO MORE VALUE INTERFACE!
+// RECORD PROCESSING - NATIVE GO TYPES
 // ============================================================================
 
 func demonstrateRecordProcessing() {
 	fmt.Println("\n📋 Record Processing")
 	fmt.Println("--------------------")
 
-	// Create records with native Go types - so clean!
+	// Create records with native Go types
 	users := stream.FromRecords([]stream.Record{
 		stream.R("id", 1, "name", "Alice", "age", 25, "score", 95.5, "active", true),
 		stream.R("id", 2, "name", "Bob", "age", 30, "score", 87.2, "active", false),
@@ -170,7 +170,7 @@ func demonstrateTypeConversion() {
 // HELPER FUNCTIONS
 // ============================================================================
 
-func printRecords(recordStream stream.RecordStream) {
+func printRecords(recordStream stream.Stream[stream.Record]) {
 	records, err := stream.Collect(recordStream)
 	if err != nil {
 		log.Printf("Error collecting records: %v", err)

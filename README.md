@@ -9,7 +9,6 @@
 
 - **🔥 Generics-First Design** - Full type safety with Go 1.21+ generics
 - **⚡ High Performance** - GPU-ready architecture with CPU fallback  
-- **🌐 Network Analytics** - Specialized operations for network data analysis
 - **🔄 Smart Type Conversion** - Automatic conversion between compatible types
 - **🧵 Parallel Processing** - Built-in concurrency for better performance
 - **📊 Rich Operations** - Functional programming patterns for data transformation
@@ -97,21 +96,24 @@ processed := stream.Chain(
 )(users)
 ```
 
-## 🌐 **Network Analytics Power**
+## 📊 **Powerful Data Processing**
 
-Perfect for analyzing network data at scale:
+Perfect for processing structured data at scale:
 
 ```go
-// High-performance network flow analysis
-processor := stream.NewProcessor(stream.WithGPUPreferred())
+// High-performance data analysis
+results := stream.Chain(
+    stream.Where(func(r stream.Record) bool {
+        return stream.GetOr(r, "active", false)
+    }),
+    stream.Update(func(r stream.Record) stream.Record {
+        score := stream.GetOr(r, "score", 0.0)
+        return r.Set("grade", calculateGrade(score))
+    }),
+    stream.GroupBy([]string{"department"}),
+)(dataStream)
 
-// Analyze millions of network flows
-insights := processor.TopTalkers(100)(networkFlows)
-alerts := processor.DDoSDetection(1000.0, 3.0)(networkFlows)
-scans := processor.PortScanDetection(time.Minute*5, 50)(networkFlows)
-
-fmt.Printf("Top talkers: %d, DDoS alerts: %d, Port scans: %d\n",
-    len(insights), len(alerts), len(scans))
+fmt.Printf("Processed %d groups\n", len(results))
 ```
 
 ## ⚡ **Performance Benchmarks**
@@ -161,11 +163,12 @@ cleaned := stream.Chain(
 )(rawDataStream)
 ```
 
-### **Network Analysis**
+### **Multi-Aggregation**
 ```go
-// Real-time network monitoring
-analyzer := stream.NetworkAnalytics(processor)
-insights := analyzer.AnalyzeFlows(100000)(networkStream)
+// Real-time data monitoring
+stats, _ := stream.MultiAggregate(dataStream)
+fmt.Printf("Count: %d, Sum: %d, Avg: %.2f\n", 
+    stats.Count, stats.Sum, stats.Avg)
 ```
 
 ## 🛠️ **Advanced Features**
@@ -199,7 +202,6 @@ stream := stream.WithContext(ctx, dataStream)
 ## 📚 **Documentation**
 
 - **[API Reference](docs/API.md)** - Complete API documentation
-- **[Migration Guide](docs/MIGRATION.md)** - Migrate from V1 to V2  
 - **[Examples](examples/)** - Working code examples
 - **[Benchmarks](benchmarks/)** - Performance comparisons
 

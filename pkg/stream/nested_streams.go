@@ -182,40 +182,6 @@ func detectStreamFields(record Record) []string {
 	return streamFields
 }
 
-// FlatMap flattens nested streams (stream of streams → single stream)
-func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
-	return func(input Stream[T]) Stream[U] {
-		var currentSubStream Stream[U]
-
-		return func() (U, error) {
-			for {
-				// Try to get from current sub-stream
-				if currentSubStream != nil {
-					val, err := currentSubStream()
-					if err == nil {
-						return val, nil
-					}
-					if err != EOS {
-						var zero U
-						return zero, err
-					}
-					// Current sub-stream is exhausted
-					currentSubStream = nil
-				}
-
-				// Get next item from main stream
-				item, err := input()
-				if err != nil {
-					var zero U
-					return zero, err
-				}
-
-				// Create new sub-stream
-				currentSubStream = fn(item)
-			}
-		}
-	}
-}
 
 // ExpandStreamsDot expands stream fields using dot product (element-wise pairing)
 // For streams of different lengths, shorter streams are exhausted first
@@ -514,10 +480,6 @@ func generateCrossProduct(fields []string, values map[string][]any) []map[string
 	return allCombinations
 }
 
-// ExpandStreams is an alias for ExpandStreamsDot for backward compatibility
-func ExpandStreams(streamFields ...string) Filter[Record, Record] {
-	return ExpandStreamsDot(streamFields...)
-}
 
 // ============================================================================
 // EXAMPLES AND USAGE PATTERNS
@@ -558,48 +520,3 @@ func ProcessNestedStreams(record Record) {
 	}
 }
 
-// GroupByWithNestedStreams groups records and creates streams of grouped data
-func GroupByWithNestedStreams(keyFields []string) Filter[Record, Record] {
-	return func(input Stream[Record]) Stream[Record] {
-		// Collect all records
-		records, err := Collect(input)
-		if err != nil {
-			return func() (Record, error) { return nil, err }
-		}
-
-		// Group records
-		groups := make(map[string][]Record)
-		for _, record := range records {
-			key := ""
-			for _, field := range keyFields {
-				if val, exists := record[field]; exists {
-					key += fmt.Sprintf("%v,", val)
-				}
-			}
-			groups[key] = append(groups[key], record)
-		}
-
-		// Create results with grouped data as streams
-		var results []Record
-		for _, groupRecords := range groups {
-			result := make(Record)
-
-			// Add key fields from first record
-			if len(groupRecords) > 0 {
-				for _, field := range keyFields {
-					if val, exists := groupRecords[0][field]; exists {
-						result[field] = val
-					}
-				}
-			}
-
-			// Add grouped records as a stream
-			result["grouped_records"] = NewStreamValue(FromSlice(groupRecords))
-			result["group_count"] = len(groupRecords)
-
-			results = append(results, result)
-		}
-
-		return FromSlice(results)
-	}
-}

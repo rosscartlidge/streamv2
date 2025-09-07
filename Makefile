@@ -44,8 +44,6 @@ examples:
 	@echo "Running examples..."
 	@echo "=== Basic Example ==="
 	$(GO) run ./examples/basic_example.go
-	@echo "=== Network Example ==="
-	$(GO) run ./examples/network_example.go
 	@echo "=== Nested Streams Example ==="
 	$(GO) run ./examples/nested_streams_example.go
 	@echo "=== Multi-Aggregation Example ==="

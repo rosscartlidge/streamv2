@@ -150,8 +150,8 @@ func demonstrateGroupingWithStreams() {
 		stream.R("name", "Eve", "department", "engineering", "score", 91),
 	})
 
-	// Group by department, creating streams of grouped records
-	groupedByDept := stream.GroupByWithNestedStreams([]string{"department"})(users)
+	// Group by department - returns one record per department with nested grouped_records stream
+	groupedByDept := stream.GroupBy([]string{"department"})(users)
 
 	groupedRecords, _ := stream.Collect(groupedByDept)
 	fmt.Printf("Grouped into %d departments\n", len(groupedRecords))
@@ -272,7 +272,7 @@ func demonstrateFlatMapping() {
 // HELPER FUNCTIONS
 // ============================================================================
 
-func printRecordsWithStreams(recordStream stream.RecordStream) {
+func printRecordsWithStreams(recordStream stream.Stream[stream.Record]) {
 	records, err := stream.Collect(recordStream)
 	if err != nil {
 		log.Printf("Error collecting records: %v", err)
@@ -284,7 +284,7 @@ func printRecordsWithStreams(recordStream stream.RecordStream) {
 	}
 }
 
-func printRecords(recordStream stream.RecordStream) {
+func printRecords(recordStream stream.Stream[stream.Record]) {
 	records, err := stream.Collect(recordStream)
 	if err != nil {
 		log.Printf("Error collecting records: %v", err)

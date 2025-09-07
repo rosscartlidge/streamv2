@@ -31,7 +31,7 @@ func demonstrateBasicMultiAggregation() {
 	// Create sample data
 	scores := stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
 
-	fmt.Println("Problem: Previously you could only do ONE aggregation per stream:")
+	fmt.Println("Challenge: Streams are consumed once, so multiple aggregations need special handling:")
 	fmt.Println("  sum, _ := stream.Sum(scores)    // ✅ Works")
 	fmt.Println("  count, _ := stream.Count(scores) // ❌ Fails - stream already consumed!")
 
