@@ -116,7 +116,8 @@ func demonstrateTypeSafety() {
 	fmt.Println("```go")
 	fmt.Println("// Type-safe field extraction")
 	fmt.Println("salaries := stream.ExtractField[float64](\"salary\")(userStream)")
-	fmt.Println("avgSalary, _ := stream.Average(salaries)  // float64, guaranteed")
+	fmt.Println("stats, _ := stream.Aggregates(salaries, stream.AvgSpec[float64](\"avg\"))")
+	fmt.Println("avgSalary := stats[\"avg\"].(float64)  // float64, guaranteed")
 	fmt.Println("")
 	fmt.Println("// Compile-time verification")
 	fmt.Println("ages := stream.ExtractField[int](\"age\")(userStream)")
@@ -129,7 +130,8 @@ func demonstrateTypeSafety() {
 	streams := stream.Tee(userStream, 2)
 
 	salaries := stream.ExtractField[float64]("salary")(streams[0])
-	avgSalary, _ := stream.Average(salaries)
+	salaryStats, _ := stream.Aggregates(salaries, stream.AvgSpec[float64]("average"))
+	avgSalary := salaryStats["average"].(float64)
 
 	ages := stream.ExtractField[int]("age")(streams[1])
 	maxAge, _ := stream.Max(ages)
@@ -178,12 +180,10 @@ func demonstrateAggregations() {
 	// ========================================
 	// STREAMV2 - Multi-Aggregation
 	// ========================================
-	fmt.Println("📦 StreamV2 (Multi-Aggregation):")
+	fmt.Println("📦 StreamV2 (Generalized Aggregations):")
 	fmt.Println("```go")
-	fmt.Println("// Single pass through data")
-	fmt.Println("stats, _ := stream.MultiAggregate(salesStream)")
-	fmt.Println("// OR use generalized aggregators")
-	fmt.Println("result, _ := stream.Aggregates(salesStream,")
+	fmt.Println("// Single pass through data with multiple aggregations")
+	fmt.Println("stats, _ := stream.Aggregates(salesStream,")
 	fmt.Println("    stream.CountSpec[int64](\"transactions\"),")
 	fmt.Println("    stream.SumSpec[int64](\"total_sales\"),")
 	fmt.Println("    stream.AvgSpec[int64](\"average\"),")
@@ -193,13 +193,19 @@ func demonstrateAggregations() {
 	fmt.Println("```")
 
 	salesStream := stream.FromSlice(salesData)
-	stats, _ := stream.MultiAggregate(salesStream)
+	stats, _ := stream.Aggregates(salesStream,
+		stream.CountSpec[int64]("transactions"),
+		stream.SumSpec[int64]("total_sales"),
+		stream.AvgSpec[int64]("average"),
+		stream.MinSpec[int64]("minimum"),
+		stream.MaxSpec[int64]("maximum"),
+	)
 
 	fmt.Printf("📊 Sales Statistics:\n")
-	fmt.Printf("   Transactions: %d\n", stats.Count)
-	fmt.Printf("   Total Sales: $%d\n", stats.Sum)
-	fmt.Printf("   Average: $%.2f\n", stats.Avg)
-	fmt.Printf("   Range: $%d - $%d\n", stats.Min, stats.Max)
+	fmt.Printf("   Transactions: %d\n", stats["transactions"])
+	fmt.Printf("   Total Sales: $%d\n", stats["total_sales"])
+	fmt.Printf("   Average: $%.2f\n", stats["average"])
+	fmt.Printf("   Range: $%d - $%d\n", stats["minimum"], stats["maximum"])
 	fmt.Printf("✅ Single pass through data\n")
 	fmt.Printf("✅ All statistics computed simultaneously\n")
 	fmt.Printf("✅ Type-safe aggregator composition\n\n")
@@ -221,9 +227,9 @@ func demonstrateAggregations() {
 	fmt.Println("// etc. for min, max")
 	fmt.Println("```")
 	fmt.Printf("📊 Sales Statistics: (same results)\n")
-	fmt.Printf("   Transactions: %d\n", stats.Count)
-	fmt.Printf("   Total Sales: $%d\n", stats.Sum)
-	fmt.Printf("   Average: $%.2f\n", stats.Avg)
+	fmt.Printf("   Transactions: %d\n", stats["transactions"])
+	fmt.Printf("   Total Sales: $%d\n", stats["total_sales"])
+	fmt.Printf("   Average: $%.2f\n", stats["average"])
 	fmt.Printf("❌ Multiple passes through same data\n")
 	fmt.Printf("❌ Complex sink orchestration\n")
 	fmt.Printf("❌ Higher memory and CPU usage\n")

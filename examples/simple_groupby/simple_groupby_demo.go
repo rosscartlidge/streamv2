@@ -13,11 +13,11 @@ func main() {
 
 	// Create test data
 	users := stream.FromRecords([]stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", 95000),
-		stream.R("name", "Bob", "department", "engineering", "salary", 87000),
-		stream.R("name", "Charlie", "department", "sales", "salary", 92000),
-		stream.R("name", "Diana", "department", "sales", "salary", 88000),
-		stream.R("name", "Eve", "department", "engineering", "salary", 91000),
+		stream.R("name", "Alice", "department", "engineering", "salary", int64(95000)),
+		stream.R("name", "Bob", "department", "engineering", "salary", int64(87000)),
+		stream.R("name", "Charlie", "department", "sales", "salary", int64(92000)),
+		stream.R("name", "Diana", "department", "sales", "salary", int64(88000)),
+		stream.R("name", "Eve", "department", "engineering", "salary", int64(91000)),
 	})
 
 	fmt.Println("\n📊 Basic GroupBy (count only):")
@@ -32,19 +32,19 @@ func main() {
 
 	// Reset data for next test
 	users = stream.FromRecords([]stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", 95000),
-		stream.R("name", "Bob", "department", "engineering", "salary", 87000),
-		stream.R("name", "Charlie", "department", "sales", "salary", 92000),
-		stream.R("name", "Diana", "department", "sales", "salary", 88000),
-		stream.R("name", "Eve", "department", "engineering", "salary", 91000),
+		stream.R("name", "Alice", "department", "engineering", "salary", int64(95000)),
+		stream.R("name", "Bob", "department", "engineering", "salary", int64(87000)),
+		stream.R("name", "Charlie", "department", "sales", "salary", int64(92000)),
+		stream.R("name", "Diana", "department", "sales", "salary", int64(88000)),
+		stream.R("name", "Eve", "department", "engineering", "salary", int64(91000)),
 	})
 
 	fmt.Println("\n💰 GroupBy with Salary Aggregations:")
-	groupedWithStats := stream.GroupByWith([]string{"department"}, 
-		stream.FieldAvgSpec[int]("avg_salary", "salary"),
-		stream.FieldMinSpec[int]("min_salary", "salary"),
-		stream.FieldMaxSpec[int]("max_salary", "salary"),
-		stream.FieldSumSpec[int]("total_salary", "salary"),
+	groupedWithStats := stream.GroupBy([]string{"department"}, 
+		stream.FieldAvgSpec[int64]("avg_salary", "salary"),
+		stream.FieldMinSpec[int64]("min_salary", "salary"),
+		stream.FieldMaxSpec[int64]("max_salary", "salary"),
+		stream.FieldSumSpec[int64]("total_salary", "salary"),
 	)(users)
 
 	statsResults, _ := stream.Collect(groupedWithStats)

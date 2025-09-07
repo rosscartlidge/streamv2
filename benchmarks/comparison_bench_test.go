@@ -206,7 +206,13 @@ func BenchmarkStreamV2_MultiAggregate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
-		_, _ = stream.MultiAggregate(dataStream)
+		_, _ = stream.Aggregates(dataStream,
+			stream.CountSpec[int64]("count"),
+			stream.SumSpec[int64]("sum"),
+			stream.MinSpec[int64]("min"),
+			stream.MaxSpec[int64]("max"),
+			stream.AvgSpec[int64]("avg"),
+		)
 	}
 }
 

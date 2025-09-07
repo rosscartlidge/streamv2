@@ -44,10 +44,10 @@ examples:
 	@echo "Running examples..."
 	@echo "=== Basic Example ==="
 	$(GO) run ./examples/basic_example.go
-	@echo "=== Nested Streams Example ==="
-	$(GO) run ./examples/nested_streams_example.go
 	@echo "=== Multi-Aggregation Example ==="
 	$(GO) run ./examples/multi_aggregation_example.go
+	@echo "=== GroupBy Example ==="
+	$(GO) run ./examples/simple_groupby_demo.go
 
 benchmark:
 	@echo "Running benchmarks..."

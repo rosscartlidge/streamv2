@@ -29,80 +29,22 @@ type Comparable interface {
 
 // Sum aggregates numeric values
 func Sum[T Numeric](stream Stream[T]) (T, error) {
-	var total T
-	for {
-		val, err := stream()
-		if err != nil {
-			if errors.Is(err, EOS) {
-				return total, nil
-			}
-			return total, err
-		}
-		total += val
-	}
+	return RunAggregator(stream, SumAggregator[T, T](func(val T) T { return val }))
 }
 
 // Count counts elements
 func Count[T any](stream Stream[T]) (int64, error) {
-	var count int64
-	for {
-		_, err := stream()
-		if err != nil {
-			if errors.Is(err, EOS) {
-				return count, nil
-			}
-			return count, err
-		}
-		count++
-	}
+	return RunAggregator(stream, CountAggregator[T]())
 }
 
 // Max finds maximum value
 func Max[T Comparable](stream Stream[T]) (T, error) {
-	var max T
-	first := true
-
-	for {
-		val, err := stream()
-		if err != nil {
-			if errors.Is(err, EOS) {
-				if first {
-					return max, errors.New("empty stream")
-				}
-				return max, nil
-			}
-			return max, err
-		}
-
-		if first || val > max {
-			max = val
-			first = false
-		}
-	}
+	return RunAggregator(stream, MaxAggregator[T, T](func(val T) T { return val }))
 }
 
 // Min finds minimum value
 func Min[T Comparable](stream Stream[T]) (T, error) {
-	var min T
-	first := true
-
-	for {
-		val, err := stream()
-		if err != nil {
-			if errors.Is(err, EOS) {
-				if first {
-					return min, errors.New("empty stream")
-				}
-				return min, nil
-			}
-			return min, err
-		}
-
-		if first || val < min {
-			min = val
-			first = false
-		}
-	}
+	return RunAggregator(stream, MinAggregator[T, T](func(val T) T { return val }))
 }
 
 // ============================================================================
@@ -229,33 +171,41 @@ func AggregateTriple[T any, A1, A2, A3, R1, R2, R3 any](
 	return result1, result2, result3, nil
 }
 
+// RunAggregator runs a single aggregator on a stream and returns the result
+func RunAggregator[T, A, R any](stream Stream[T], agg Aggregator[T, A, R]) (R, error) {
+	acc := agg.Initial()
+	for {
+		val, err := stream()
+		if err != nil {
+			if errors.Is(err, EOS) {
+				return agg.Finalize(acc), nil
+			}
+			var zero R
+			return zero, err
+		}
+		acc = agg.Accumulate(acc, val)
+	}
+}
+
 // ============================================================================
-// BUILT-IN AGGREGATORS
+// GENERIC AGGREGATOR FACTORIES
 // ============================================================================
 
-// SumAgg creates a sum aggregator
-func SumAgg[T Numeric]() Aggregator[T, T, T] {
-	return Aggregator[T, T, T]{
+// SumAggregator creates a sum aggregator with custom value extraction
+func SumAggregator[I any, T Numeric](extract func(I) T) Aggregator[I, T, T] {
+	return Aggregator[I, T, T]{
 		Initial:    func() T { var zero T; return zero },
-		Accumulate: func(acc T, val T) T { return acc + val },
+		Accumulate: func(acc T, input I) T { return acc + extract(input) },
 		Finalize:   func(acc T) T { return acc },
 	}
 }
 
-// CountAgg creates a count aggregator  
-func CountAgg[T any]() Aggregator[T, int64, int64] {
-	return Aggregator[T, int64, int64]{
-		Initial:    func() int64 { return 0 },
-		Accumulate: func(acc int64, val T) int64 { return acc + 1 },
-		Finalize:   func(acc int64) int64 { return acc },
-	}
-}
-
-// MinAgg creates a min aggregator
-func MinAgg[T Comparable]() Aggregator[T, *T, T] {
-	return Aggregator[T, *T, T]{
+// MinAggregator creates a min aggregator with custom value extraction  
+func MinAggregator[I any, T Comparable](extract func(I) T) Aggregator[I, *T, T] {
+	return Aggregator[I, *T, T]{
 		Initial: func() *T { return nil },
-		Accumulate: func(acc *T, val T) *T {
+		Accumulate: func(acc *T, input I) *T {
+			val := extract(input)
 			if acc == nil || val < *acc {
 				return &val
 			}
@@ -271,11 +221,12 @@ func MinAgg[T Comparable]() Aggregator[T, *T, T] {
 	}
 }
 
-// MaxAgg creates a max aggregator
-func MaxAgg[T Comparable]() Aggregator[T, *T, T] {
-	return Aggregator[T, *T, T]{
+// MaxAggregator creates a max aggregator with custom value extraction
+func MaxAggregator[I any, T Comparable](extract func(I) T) Aggregator[I, *T, T] {
+	return Aggregator[I, *T, T]{
 		Initial: func() *T { return nil },
-		Accumulate: func(acc *T, val T) *T {
+		Accumulate: func(acc *T, input I) *T {
+			val := extract(input)
 			if acc == nil || val > *acc {
 				return &val
 			}
@@ -291,11 +242,12 @@ func MaxAgg[T Comparable]() Aggregator[T, *T, T] {
 	}
 }
 
-// AvgAgg creates an average aggregator
-func AvgAgg[T Numeric]() Aggregator[T, [2]float64, float64] {
-	return Aggregator[T, [2]float64, float64]{
+// AvgAggregator creates an average aggregator with custom value extraction
+func AvgAggregator[I any, T Numeric](extract func(I) T) Aggregator[I, [2]float64, float64] {
+	return Aggregator[I, [2]float64, float64]{
 		Initial: func() [2]float64 { return [2]float64{0, 0} }, // [sum, count]
-		Accumulate: func(acc [2]float64, val T) [2]float64 {
+		Accumulate: func(acc [2]float64, input I) [2]float64 {
+			val := extract(input)
 			return [2]float64{acc[0] + float64(val), acc[1] + 1}
 		},
 		Finalize: func(acc [2]float64) float64 {
@@ -305,6 +257,60 @@ func AvgAgg[T Numeric]() Aggregator[T, [2]float64, float64] {
 			return acc[0] / acc[1]
 		},
 	}
+}
+
+// CountAggregator creates a count aggregator (doesn't need value extraction)
+func CountAggregator[I any]() Aggregator[I, int64, int64] {
+	return Aggregator[I, int64, int64]{
+		Initial:    func() int64 { return 0 },
+		Accumulate: func(acc int64, _ I) int64 { return acc + 1 },
+		Finalize:   func(acc int64) int64 { return acc },
+	}
+}
+
+// ============================================================================
+// BUILT-IN AGGREGATORS - using the generic factories
+// ============================================================================
+
+
+
+
+
+
+// ============================================================================
+// FIELD AGGREGATORS - operate on Record streams by extracting fields
+// ============================================================================
+
+// FieldSumAgg creates an aggregator that sums a numeric field in records
+func FieldSumAgg[T Numeric](fieldName string) Aggregator[Record, T, T] {
+	return SumAggregator[Record, T](func(r Record) T {
+		var zero T
+		return GetOr(r, fieldName, zero)
+	})
+}
+
+// FieldAvgAgg creates an aggregator that averages a numeric field in records
+func FieldAvgAgg[T Numeric](fieldName string) Aggregator[Record, [2]float64, float64] {
+	return AvgAggregator[Record, T](func(r Record) T {
+		var zero T
+		return GetOr(r, fieldName, zero)
+	})
+}
+
+// FieldMinAgg creates an aggregator that finds the minimum of a field in records
+func FieldMinAgg[T Comparable](fieldName string) Aggregator[Record, *T, T] {
+	return MinAggregator[Record, T](func(r Record) T {
+		var zero T
+		return GetOr(r, fieldName, zero)
+	})
+}
+
+// FieldMaxAgg creates an aggregator that finds the maximum of a field in records
+func FieldMaxAgg[T Comparable](fieldName string) Aggregator[Record, *T, T] {
+	return MaxAggregator[Record, T](func(r Record) T {
+		var zero T
+		return GetOr(r, fieldName, zero)
+	})
 }
 
 // ============================================================================
@@ -361,23 +367,23 @@ func Aggregates[T any](stream Stream[T], specs ...AggregatorSpec[T]) (Record, er
 
 // Helper functions to create aggregator specs
 func SumSpec[T Numeric](name string) AggregatorSpec[T] {
-	return AggregatorSpec[T]{Name: name, Agg: SumAgg[T]()}
+	return AggregatorSpec[T]{Name: name, Agg: SumAggregator[T, T](func(val T) T { return val })}
 }
 
 func CountSpec[T any](name string) AggregatorSpec[T] {
-	return AggregatorSpec[T]{Name: name, Agg: CountAgg[T]()}
+	return AggregatorSpec[T]{Name: name, Agg: CountAggregator[T]()}
 }
 
 func MinSpec[T Comparable](name string) AggregatorSpec[T] {
-	return AggregatorSpec[T]{Name: name, Agg: MinAgg[T]()}
+	return AggregatorSpec[T]{Name: name, Agg: MinAggregator[T, T](func(val T) T { return val })}
 }
 
 func MaxSpec[T Comparable](name string) AggregatorSpec[T] {
-	return AggregatorSpec[T]{Name: name, Agg: MaxAgg[T]()}
+	return AggregatorSpec[T]{Name: name, Agg: MaxAggregator[T, T](func(val T) T { return val })}
 }
 
 func AvgSpec[T Numeric](name string) AggregatorSpec[T] {
-	return AggregatorSpec[T]{Name: name, Agg: AvgAgg[T]()}
+	return AggregatorSpec[T]{Name: name, Agg: AvgAggregator[T, T](func(val T) T { return val })}
 }
 
 // CustomSpec creates a spec for any custom aggregator
@@ -385,81 +391,6 @@ func CustomSpec[T, A, R any](name string, agg Aggregator[T, A, R]) AggregatorSpe
 	return AggregatorSpec[T]{Name: name, Agg: agg}
 }
 
-// ============================================================================
-// SIMPLIFIED MULTI-AGGREGATION
-// ============================================================================
-
-// Stats holds multiple aggregation results computed in a single pass
-type Stats[T Numeric] struct {
-	Count int64
-	Sum   T
-	Min   T
-	Max   T
-	Avg   float64
-}
-
-// MultiAggregate computes multiple statistics in a single pass through the stream
-func MultiAggregate[T Numeric](stream Stream[T]) (Stats[T], error) {
-	var stats Stats[T]
-	first := true
-	
-	for {
-		val, err := stream()
-		if err != nil {
-			if errors.Is(err, EOS) {
-				if stats.Count > 0 {
-					stats.Avg = float64(stats.Sum) / float64(stats.Count)
-				}
-				return stats, nil
-			}
-			return stats, err
-		}
-		
-		stats.Count++
-		stats.Sum += val
-		
-		if first {
-			stats.Min = val
-			stats.Max = val
-			first = false
-		} else {
-			if val < stats.Min {
-				stats.Min = val
-			}
-			if val > stats.Max {
-				stats.Max = val
-			}
-		}
-	}
-}
-
-// SumAndCount computes both sum and count in a single pass
-func SumAndCount[T Numeric](stream Stream[T]) (sum T, count int64, err error) {
-	var zero T
-	for {
-		val, streamErr := stream()
-		if streamErr != nil {
-			if errors.Is(streamErr, EOS) {
-				return sum, count, nil
-			}
-			return zero, 0, streamErr
-		}
-		sum += val
-		count++
-	}
-}
-
-// Average computes the average in a single pass (combines sum and count)
-func Average[T Numeric](stream Stream[T]) (float64, error) {
-	sum, count, err := SumAndCount(stream)
-	if err != nil {
-		return 0, err
-	}
-	if count == 0 {
-		return 0, errors.New("empty stream")
-	}
-	return float64(sum) / float64(count), nil
-}
 
 // ============================================================================
 // GROUPBY OPERATIONS - SQL-LIKE GROUPING
@@ -476,15 +407,11 @@ func Average[T Numeric](stream Stream[T]) (float64, error) {
 //   grouped := stream.GroupBy([]string{"department"})(users)
 //   // Each result contains: department, group_count
 //
-//   groupedWithAvg := stream.GroupByWith([]string{"department"}, 
+//   groupedWithAvg := stream.GroupBy([]string{"department"}, 
 //       stream.AvgSpec[float64]("avg_salary"))(users)
 //   // Each result contains: department, group_count, avg_salary
-func GroupBy(keyFields []string) Filter[Record, Record] {
-	return GroupByWith(keyFields)
-}
-
-// GroupByWith groups records and applies custom aggregations to each group
-func GroupByWith(keyFields []string, aggregators ...AggregatorSpec[Record]) Filter[Record, Record] {
+// GroupBy groups records and applies custom aggregations to each group
+func GroupBy(keyFields []string, aggregators ...AggregatorSpec[Record]) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
 		// Collect all records
 		records, err := Collect(input)
@@ -520,11 +447,29 @@ func GroupByWith(keyFields []string, aggregators ...AggregatorSpec[Record]) Filt
 			// Apply custom aggregations to this group
 			if len(aggregators) > 0 {
 				groupStream := FromSlice(groupRecords)
-				aggregateResults, err := Aggregates(groupStream, aggregators...)
-				if err == nil {
-					// Merge aggregation results into the result record
-					for key, value := range aggregateResults {
-						result[key] = value
+				
+				// Run each aggregator directly on the group
+				for _, spec := range aggregators {
+					var value interface{}
+					var err error
+					
+					// Type-assert the specific Record aggregator types
+					switch agg := spec.Agg.(type) {
+					case Aggregator[Record, int64, int64]:
+						value, err = AggregateWith(groupStream, agg)
+						groupStream = FromSlice(groupRecords) // Reset for next aggregator
+					case Aggregator[Record, [2]float64, float64]:
+						value, err = AggregateWith(groupStream, agg)
+						groupStream = FromSlice(groupRecords) // Reset for next aggregator
+					case Aggregator[Record, *int64, int64]:
+						value, err = AggregateWith(groupStream, agg)
+						groupStream = FromSlice(groupRecords) // Reset for next aggregator
+					default:
+						err = fmt.Errorf("unsupported aggregator type for '%s'", spec.Name)
+					}
+					
+					if err == nil {
+						result[spec.Name] = value
 					}
 				}
 			}
@@ -558,75 +503,20 @@ func buildGroupKey(record Record, keyFields []string) string {
 
 // FieldSumSpec creates an aggregator that sums a numeric field in records
 func FieldSumSpec[T Numeric](name, fieldName string) AggregatorSpec[Record] {
-	agg := Aggregator[Record, T, T]{
-		Initial: func() T { var zero T; return zero },
-		Accumulate: func(acc T, r Record) T {
-			val := GetOr(r, fieldName, T(0))
-			return acc + val
-		},
-		Finalize: func(acc T) T { return acc },
-	}
-	return AggregatorSpec[Record]{Name: name, Agg: agg}
+	return AggregatorSpec[Record]{Name: name, Agg: FieldSumAgg[T](fieldName)}
 }
 
 // FieldAvgSpec creates an aggregator that averages a numeric field in records
 func FieldAvgSpec[T Numeric](name, fieldName string) AggregatorSpec[Record] {
-	agg := Aggregator[Record, [2]float64, float64]{
-		Initial: func() [2]float64 { return [2]float64{0, 0} }, // [sum, count]
-		Accumulate: func(acc [2]float64, r Record) [2]float64 {
-			val := GetOr(r, fieldName, T(0))
-			return [2]float64{acc[0] + float64(val), acc[1] + 1}
-		},
-		Finalize: func(acc [2]float64) float64 {
-			if acc[1] == 0 {
-				return 0
-			}
-			return acc[0] / acc[1]
-		},
-	}
-	return AggregatorSpec[Record]{Name: name, Agg: agg}
+	return AggregatorSpec[Record]{Name: name, Agg: FieldAvgAgg[T](fieldName)}
 }
 
 // FieldMinSpec creates an aggregator that finds the minimum of a field in records
 func FieldMinSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
-	agg := Aggregator[Record, *T, T]{
-		Initial: func() *T { return nil },
-		Accumulate: func(acc *T, r Record) *T {
-			val := GetOr(r, fieldName, T(0))
-			if acc == nil || val < *acc {
-				return &val
-			}
-			return acc
-		},
-		Finalize: func(acc *T) T {
-			if acc == nil {
-				var zero T
-				return zero
-			}
-			return *acc
-		},
-	}
-	return AggregatorSpec[Record]{Name: name, Agg: agg}
+	return AggregatorSpec[Record]{Name: name, Agg: FieldMinAgg[T](fieldName)}
 }
 
 // FieldMaxSpec creates an aggregator that finds the maximum of a field in records
 func FieldMaxSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
-	agg := Aggregator[Record, *T, T]{
-		Initial: func() *T { return nil },
-		Accumulate: func(acc *T, r Record) *T {
-			val := GetOr(r, fieldName, T(0))
-			if acc == nil || val > *acc {
-				return &val
-			}
-			return acc
-		},
-		Finalize: func(acc *T) T {
-			if acc == nil {
-				var zero T
-				return zero
-			}
-			return *acc
-		},
-	}
-	return AggregatorSpec[Record]{Name: name, Agg: agg}
+	return AggregatorSpec[Record]{Name: name, Agg: FieldMaxAgg[T](fieldName)}
 }

@@ -158,9 +158,9 @@ result, _ := stream.Aggregates(dataStream,
     stream.MaxSpec[int]("maximum"),
 )
 
-// Nested streams
-record := stream.R("data", someStream)
-expanded := stream.ExpandStreamsCross()(recordStream)
+// Complex record processing
+users := stream.GroupBy([]string{"department"}, 
+    stream.FieldAvgSpec[int64]("avg_salary", "salary"))(userStream)
 ```
 
 #### go-streams

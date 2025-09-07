@@ -35,36 +35,47 @@ func demonstrateBasicMultiAggregation() {
 	fmt.Println("  sum, _ := stream.Sum(scores)    // ✅ Works")
 	fmt.Println("  count, _ := stream.Count(scores) // ❌ Fails - stream already consumed!")
 
-	fmt.Println("\nSolution 1: MultiAggregate - All stats in one pass")
+	fmt.Println("\nSolution 1: Generalized Aggregates - All stats in one pass")
 
 	// Reset stream
 	scores = stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
-	stats, err := stream.MultiAggregate(scores)
+	stats, err := stream.Aggregates(scores,
+		stream.CountSpec[int64]("count"),
+		stream.SumSpec[int64]("sum"), 
+		stream.MinSpec[int64]("min"),
+		stream.MaxSpec[int64]("max"),
+		stream.AvgSpec[int64]("avg"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("  📈 Count: %d\n", stats.Count)
-	fmt.Printf("  📈 Sum:   %d\n", stats.Sum)
-	fmt.Printf("  📈 Min:   %d\n", stats.Min)
-	fmt.Printf("  📈 Max:   %d\n", stats.Max)
-	fmt.Printf("  📈 Avg:   %.2f\n", stats.Avg)
+	fmt.Printf("  📈 Count: %d\n", stats["count"])
+	fmt.Printf("  📈 Sum:   %d\n", stats["sum"])
+	fmt.Printf("  📈 Min:   %d\n", stats["min"])
+	fmt.Printf("  📈 Max:   %d\n", stats["max"])
+	fmt.Printf("  📈 Avg:   %.2f\n", stats["avg"])
 
-	fmt.Println("\nSolution 2: Specific dual aggregations")
+	fmt.Println("\nSolution 2: Two specific aggregations")
 	scores2 := stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
-	sum, count, err := stream.SumAndCount(scores2)
+	results, err := stream.Aggregates(scores2,
+		stream.SumSpec[int64]("total"),
+		stream.CountSpec[int64]("count"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
+	sum := results["total"].(int64)
+	count := results["count"].(int64)
 	fmt.Printf("  📈 Sum and Count: %d, %d (avg: %.2f)\n", sum, count, float64(sum)/float64(count))
 
-	fmt.Println("\nSolution 3: Direct Average")
+	fmt.Println("\nSolution 3: Single Average")
 	scores3 := stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
-	avg, err := stream.Average(scores3)
+	avgResult, err := stream.Aggregates(scores3, stream.AvgSpec[int64]("average"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("  📈 Average: %.2f\n", avg)
+	fmt.Printf("  📈 Average: %.2f\n", avgResult["average"])
 }
 
 // ============================================================================
@@ -132,18 +143,27 @@ func demonstrateGroupedAnalytics() {
 	fmt.Println("\nDepartment Salary Statistics:")
 	for dept, salaries := range deptData {
 		salaryStream := stream.FromSlice(salaries)
-		stats, err := stream.MultiAggregate(salaryStream)
+		stats, err := stream.Aggregates(salaryStream,
+			stream.CountSpec[int64]("count"),
+			stream.SumSpec[int64]("total"),
+			stream.AvgSpec[int64]("average"),
+			stream.MinSpec[int64]("minimum"),
+			stream.MaxSpec[int64]("maximum"),
+		)
 		if err != nil {
 			continue
 		}
 
 		fmt.Printf("\n  %s Department:\n", dept)
-		fmt.Printf("    👥 Employees: %d\n", stats.Count)
-		fmt.Printf("    💰 Total Pay: $%d\n", stats.Sum)
-		fmt.Printf("    💰 Avg Salary: $%.0f\n", stats.Avg)
-		fmt.Printf("    💰 Min Salary: $%d\n", stats.Min)
-		fmt.Printf("    💰 Max Salary: $%d\n", stats.Max)
-		fmt.Printf("    💰 Range: $%d\n", stats.Max-stats.Min)
+		fmt.Printf("    👥 Employees: %d\n", stats["count"])
+		fmt.Printf("    💰 Total Pay: $%d\n", stats["total"])
+		fmt.Printf("    💰 Avg Salary: $%.0f\n", stats["average"])
+		fmt.Printf("    💰 Min Salary: $%d\n", stats["minimum"])
+		fmt.Printf("    💰 Max Salary: $%d\n", stats["maximum"])
+		
+		min := stats["minimum"].(int64)
+		max := stats["maximum"].(int64)
+		fmt.Printf("    💰 Range: $%d\n", max-min)
 	}
 
 	// Demonstrate with experience years using Tee
@@ -154,14 +174,14 @@ func demonstrateGroupedAnalytics() {
 	}
 
 	yearsStream := stream.FromSlice(allYears)
-	yearStreams := stream.Tee(yearsStream, 3)
+	yearStats, _ := stream.Aggregates(yearsStream,
+		stream.AvgSpec[int64]("average"),
+		stream.MinSpec[int64]("minimum"), 
+		stream.MaxSpec[int64]("maximum"),
+	)
 
-	avgYears, _ := stream.Average(yearStreams[0])
-	minYears, _ := stream.Min(yearStreams[1])
-	maxYears, _ := stream.Max(yearStreams[2])
-
-	fmt.Printf("  📅 Average Experience: %.1f years\n", avgYears)
-	fmt.Printf("  📅 Experience Range: %d - %d years\n", minYears, maxYears)
+	fmt.Printf("  📅 Average Experience: %.1f years\n", yearStats["average"])
+	fmt.Printf("  📅 Experience Range: %d - %d years\n", yearStats["minimum"], yearStats["maximum"])
 }
 
 func init() {
