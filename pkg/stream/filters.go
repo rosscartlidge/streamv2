@@ -2,6 +2,8 @@ package stream
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 )
 
@@ -119,6 +121,11 @@ func Select(fields ...string) Filter[Record, Record] {
 		result := make(Record)
 		for _, field := range fields {
 			if val, exists := r[field]; exists {
+				// Since we're copying from a valid Record, the fields should be valid
+				// But let's validate to be safe
+				if !isValidFieldType(val) {
+					panic(fmt.Sprintf("Selected field '%s' has invalid type %s", field, getFieldTypeName(reflect.TypeOf(val))))
+				}
 				result[field] = val
 			}
 		}
@@ -128,7 +135,14 @@ func Select(fields ...string) Filter[Record, Record] {
 
 // Update modifies records
 func Update(fn func(Record) Record) Filter[Record, Record] {
-	return Map(fn)
+	return Map(func(r Record) Record {
+		result := fn(r)
+		// Validate the result to ensure user function returned valid Record
+		if err := ValidateRecord(result); err != nil {
+			panic(fmt.Sprintf("Update function returned invalid Record: %v", err))
+		}
+		return result
+	})
 }
 
 // ExtractField gets a typed field from records
@@ -203,30 +217,61 @@ func WithContext[T any](ctx context.Context, stream Stream[T]) Stream[T] {
 // STREAM UTILITIES
 // ============================================================================
 
-// Tee splits a stream into multiple identical streams for parallel consumption
+// Tee splits a stream into multiple identical streams for parallel consumption.
+// Works with both finite and infinite streams using a broadcasting dispatcher.
 func Tee[T any](stream Stream[T], n int) []Stream[T] {
 	if n <= 0 {
 		return nil
 	}
 	
-	// Collect all values first
-	values, err := Collect(stream)
-	if err != nil {
-		// Return n error streams
-		errorStreams := make([]Stream[T], n)
-		for i := range errorStreams {
-			errorStreams[i] = func() (T, error) {
-				var zero T
-				return zero, err
-			}
-		}
-		return errorStreams
+	// Create channels for each output stream
+	channels := make([]chan T, n)
+	for i := 0; i < n; i++ {
+		channels[i] = make(chan T, 100) // Buffer to handle backpressure
 	}
 	
-	// Create n independent streams from the collected values
+	// Start broadcaster goroutine
+	go func() {
+		defer func() {
+			// Close all channels when source stream ends
+			for _, ch := range channels {
+				close(ch)
+			}
+		}()
+		
+		for {
+			item, err := stream()
+			if err != nil {
+				// Source stream ended (finite stream case) or error
+				return
+			}
+			
+			// Broadcast to all channels
+			for _, ch := range channels {
+				select {
+				case ch <- item:
+					// Successfully sent
+				default:
+					// Channel buffer full - implement backpressure policy
+					// For now, block and wait (could implement dropping policy)
+					ch <- item
+				}
+			}
+		}
+	}()
+	
+	// Create output streams that read from their respective channels
 	streams := make([]Stream[T], n)
 	for i := 0; i < n; i++ {
-		streams[i] = FromSlice(values) // Each stream gets its own copy
+		ch := channels[i] // Capture for closure
+		streams[i] = func() (T, error) {
+			item, ok := <-ch
+			if !ok {
+				var zero T
+				return zero, EOS // Channel closed - source stream ended
+			}
+			return item, nil
+		}
 	}
 	
 	return streams
@@ -266,3 +311,582 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 		}
 	}
 }
+
+// Split splits a stream of records into substreams based on key fields.
+// Each substream contains all records that share the same key values.
+// Works with both finite and infinite streams using a central dispatcher.
+func Split(keyFields []string) Filter[Record, Stream[Record]] {
+	return func(input Stream[Record]) Stream[Stream[Record]] {
+		// Channels for communication between dispatcher and substreams
+		newSubstreams := make(chan Stream[Record], 10) // Buffer to prevent blocking
+		groupChannels := make(map[string]chan Record)
+		
+		// Start dispatcher goroutine
+		go func() {
+			defer func() {
+				// Close all group channels when input ends
+				for _, ch := range groupChannels {
+					close(ch)
+				}
+				close(newSubstreams)
+			}()
+			
+			for {
+				record, err := input()
+				if err != nil {
+					// Input stream ended (finite stream case)
+					return
+				}
+				
+				key := buildGroupKey(record, keyFields)
+				
+				// Create new substream if we haven't seen this key
+				if _, exists := groupChannels[key]; !exists {
+					// Create buffered channel for this group
+					groupChan := make(chan Record, 100) // Larger buffer for backpressure
+					groupChannels[key] = groupChan
+					
+					// Create substream that reads from this group's channel
+					substream := func() (Record, error) {
+						record, ok := <-groupChan
+						if !ok {
+							return nil, EOS // Channel closed
+						}
+						return record, nil
+					}
+					
+					// Emit the new substream (non-blocking due to buffer)
+					select {
+					case newSubstreams <- substream:
+						// Successfully emitted
+					default:
+						// Buffer full - this is a backpressure situation
+						// For now, we'll block, but could implement dropping policy
+						newSubstreams <- substream
+					}
+				}
+				
+				// Send record to appropriate group channel
+				select {
+				case groupChannels[key] <- record:
+					// Successfully sent
+				default:
+					// Channel buffer full - implement backpressure policy
+					// For now, block and wait
+					groupChannels[key] <- record
+				}
+			}
+		}()
+		
+		// Return stream that yields substreams
+		return func() (Stream[Record], error) {
+			substream, ok := <-newSubstreams
+			if !ok {
+				return nil, EOS // No more substreams
+			}
+			return substream, nil
+		}
+	}
+}
+
+// ============================================================================
+// WINDOWING FUNCTIONS FOR INFINITE STREAMS
+// ============================================================================
+
+// CountWindow groups elements into batches of N elements.
+// Each batch is emitted as a finite stream, enabling aggregations on infinite streams.
+// Perfect for processing infinite streams in manageable chunks.
+func CountWindow[T any](windowSize int) Filter[T, Stream[T]] {
+	if windowSize <= 0 {
+		panic("CountWindow size must be positive")
+	}
+	
+	return func(input Stream[T]) Stream[Stream[T]] {
+		return func() (Stream[T], error) {
+			// Collect windowSize elements into a batch
+			batch := make([]T, 0, windowSize)
+			
+			for len(batch) < windowSize {
+				item, err := input()
+				if err != nil {
+					// If we hit EOS or error before filling window
+					if len(batch) == 0 {
+						// No elements collected, propagate error
+						return nil, err
+					}
+					// Partial batch - emit what we have
+					break
+				}
+				batch = append(batch, item)
+			}
+			
+			// Convert batch to stream
+			return FromSlice(batch), nil
+		}
+	}
+}
+
+// TimeWindow groups elements into time-based windows.
+// Collects elements for the specified duration, then emits as a finite stream.
+func TimeWindow[T any](duration time.Duration) Filter[T, Stream[T]] {
+	if duration <= 0 {
+		panic("TimeWindow duration must be positive")
+	}
+	
+	return func(input Stream[T]) Stream[Stream[T]] {
+		return func() (Stream[T], error) {
+			batch := make([]T, 0)
+			deadline := time.Now().Add(duration)
+			
+			for time.Now().Before(deadline) {
+				// Try to get next item with a small timeout
+				done := make(chan bool, 1)
+				var item T
+				var err error
+				
+				go func() {
+					item, err = input()
+					done <- true
+				}()
+				
+				select {
+				case <-done:
+					if err != nil {
+						// Stream ended or error
+						if len(batch) == 0 {
+							return nil, err
+						}
+						// Return partial batch
+						return FromSlice(batch), nil
+					}
+					batch = append(batch, item)
+					
+				case <-time.After(100 * time.Millisecond):
+					// Timeout - check if window expired
+					if time.Now().After(deadline) {
+						break
+					}
+					// Continue waiting
+				}
+			}
+			
+			if len(batch) == 0 {
+				// No items collected in time window, try once more
+				item, err := input()
+				if err != nil {
+					return nil, err
+				}
+				batch = append(batch, item)
+			}
+			
+			return FromSlice(batch), nil
+		}
+	}
+}
+
+// SlidingCountWindow creates overlapping windows of size windowSize with step stepSize.
+// Each window slides by stepSize elements, creating overlapping batches.
+func SlidingCountWindow[T any](windowSize, stepSize int) Filter[T, Stream[T]] {
+	if windowSize <= 0 || stepSize <= 0 {
+		panic("SlidingCountWindow size and step must be positive")
+	}
+	if stepSize > windowSize {
+		panic("SlidingCountWindow step cannot be larger than window size")
+	}
+	
+	return func(input Stream[T]) Stream[Stream[T]] {
+		buffer := make([]T, 0, windowSize)
+		
+		return func() (Stream[T], error) {
+			// Fill initial buffer if needed
+			for len(buffer) < windowSize {
+				item, err := input()
+				if err != nil {
+					if len(buffer) == 0 {
+						return nil, err
+					}
+					// Partial window
+					break
+				}
+				buffer = append(buffer, item)
+			}
+			
+			// Create current window
+			window := make([]T, len(buffer))
+			copy(window, buffer)
+			
+			// Slide the buffer by stepSize
+			if stepSize >= len(buffer) {
+				// Step is larger than buffer, clear it
+				buffer = buffer[:0]
+			} else {
+				// Slide buffer
+				copy(buffer, buffer[stepSize:])
+				buffer = buffer[:len(buffer)-stepSize]
+			}
+			
+			return FromSlice(window), nil
+		}
+	}
+}
+
+// ============================================================================
+// STREAMING AGGREGATORS - REAL-TIME RUNNING TOTALS
+// ============================================================================
+
+// StreamingSum emits running sum continuously as each element arrives.
+// Perfect for real-time dashboards and monitoring.
+func StreamingSum[T Numeric]() Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		var runningSum T
+		
+		return func() (T, error) {
+			value, err := input()
+			if err != nil {
+				return runningSum, err
+			}
+			
+			runningSum += value
+			return runningSum, nil
+		}
+	}
+}
+
+// StreamingCount emits running count as each element arrives.
+func StreamingCount[T any]() Filter[T, int64] {
+	return func(input Stream[T]) Stream[int64] {
+		var count int64 = 0
+		
+		return func() (int64, error) {
+			_, err := input()
+			if err != nil {
+				return count, err
+			}
+			
+			count++
+			return count, nil
+		}
+	}
+}
+
+// StreamingAvg emits running average as each element arrives.
+func StreamingAvg[T Numeric]() Filter[T, float64] {
+	return func(input Stream[T]) Stream[float64] {
+		var sum T
+		var count int64 = 0
+		
+		return func() (float64, error) {
+			value, err := input()
+			if err != nil {
+				if count == 0 {
+					return 0, err
+				}
+				return float64(sum) / float64(count), err
+			}
+			
+			sum += value
+			count++
+			return float64(sum) / float64(count), nil
+		}
+	}
+}
+
+// StreamingMax emits running maximum as each element arrives.
+func StreamingMax[T Comparable]() Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		var currentMax T
+		var hasValue bool = false
+		
+		return func() (T, error) {
+			value, err := input()
+			if err != nil {
+				return currentMax, err
+			}
+			
+			if !hasValue || value > currentMax {
+				currentMax = value
+				hasValue = true
+			}
+			
+			return currentMax, nil
+		}
+	}
+}
+
+// StreamingMin emits running minimum as each element arrives.
+func StreamingMin[T Comparable]() Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		var currentMin T
+		var hasValue bool = false
+		
+		return func() (T, error) {
+			value, err := input()
+			if err != nil {
+				return currentMin, err
+			}
+			
+			if !hasValue || value < currentMin {
+				currentMin = value
+				hasValue = true
+			}
+			
+			return currentMin, nil
+		}
+	}
+}
+
+// StreamingStats emits comprehensive running statistics for each element.
+// Returns Record with count, sum, avg, min, max.
+func StreamingStats[T Numeric]() Filter[T, Record] {
+	return func(input Stream[T]) Stream[Record] {
+		var sum T
+		var count int64 = 0
+		var currentMin, currentMax T
+		var hasValue bool = false
+		
+		return func() (Record, error) {
+			value, err := input()
+			if err != nil {
+				if count == 0 {
+					return nil, err
+				}
+				// Return final stats
+				return R(
+					"count", count,
+					"sum", sum,
+					"avg", float64(sum)/float64(count),
+					"min", currentMin,
+					"max", currentMax,
+				), err
+			}
+			
+			// Update statistics
+			sum += value
+			count++
+			
+			if !hasValue {
+				currentMin = value
+				currentMax = value
+				hasValue = true
+			} else {
+				if value < currentMin {
+					currentMin = value
+				}
+				if value > currentMax {
+					currentMax = value
+				}
+			}
+			
+			// Return current stats
+			return R(
+				"count", count,
+				"sum", sum,
+				"avg", float64(sum)/float64(count),
+				"min", currentMin,
+				"max", currentMax,
+			), nil
+		}
+	}
+}
+
+// ============================================================================
+// TRIGGER-BASED AGGREGATION SYSTEM
+// ============================================================================
+
+// Trigger interface defines when to emit aggregation results
+type Trigger[T any] interface {
+	ShouldFire(element T, state any) bool
+	ResetState() any
+}
+
+// CountTrigger fires every N elements
+type CountTrigger[T any] struct {
+	N     int
+	count int
+}
+
+func NewCountTrigger[T any](n int) *CountTrigger[T] {
+	return &CountTrigger[T]{N: n, count: 0}
+}
+
+func (ct *CountTrigger[T]) ShouldFire(element T, state any) bool {
+	ct.count++
+	return ct.count >= ct.N
+}
+
+func (ct *CountTrigger[T]) ResetState() any {
+	ct.count = 0
+	return nil
+}
+
+// ValueChangeTrigger fires when a specific field value changes
+type ValueChangeTrigger[T any] struct {
+	ExtractFunc func(T) any
+	lastValue   any
+	initialized bool
+}
+
+func NewValueChangeTrigger[T any](extractFunc func(T) any) *ValueChangeTrigger[T] {
+	return &ValueChangeTrigger[T]{
+		ExtractFunc: extractFunc,
+		initialized: false,
+	}
+}
+
+func (vct *ValueChangeTrigger[T]) ShouldFire(element T, state any) bool {
+	currentValue := vct.ExtractFunc(element)
+	
+	if !vct.initialized {
+		vct.lastValue = currentValue
+		vct.initialized = true
+		return false // Don't fire on first element
+	}
+	
+	if currentValue != vct.lastValue {
+		vct.lastValue = currentValue
+		return true
+	}
+	
+	return false
+}
+
+func (vct *ValueChangeTrigger[T]) ResetState() any {
+	// Keep the last value for next comparison
+	return nil
+}
+
+// TriggeredWindow creates windows based on trigger conditions
+func TriggeredWindow[T any](trigger Trigger[T]) Filter[T, Stream[T]] {
+	return func(input Stream[T]) Stream[Stream[T]] {
+		return func() (Stream[T], error) {
+			batch := make([]T, 0)
+			triggerState := trigger.ResetState()
+			
+			for {
+				item, err := input()
+				if err != nil {
+					// Stream ended
+					if len(batch) == 0 {
+						return nil, err
+					}
+					// Return partial batch
+					return FromSlice(batch), nil
+				}
+				
+				batch = append(batch, item)
+				
+				if trigger.ShouldFire(item, triggerState) {
+					// Fire trigger - emit current batch
+					return FromSlice(batch), nil
+				}
+			}
+		}
+	}
+}
+
+// ============================================================================
+// STREAMING GROUPBY - CONTINUOUS GROUP UPDATES
+// ============================================================================
+
+// StreamingGroupBy maintains running group statistics and emits updates.
+// Unlike regular GroupBy, this works with infinite streams by emitting
+// updated group totals as new records arrive.
+func StreamingGroupBy(keyFields []string, updateInterval int) Filter[Record, Record] {
+	return func(input Stream[Record]) Stream[Record] {
+		groupStats := make(map[string]*groupAccumulator)
+		processedCount := 0
+		
+		return func() (Record, error) {
+			// Process updateInterval records before emitting
+			for i := 0; i < updateInterval; i++ {
+				record, err := input()
+				if err != nil {
+					// Stream ended or error
+					if len(groupStats) == 0 {
+						return nil, err
+					}
+					// Emit final group summary
+					return emitGroupSummary(groupStats, processedCount), err
+				}
+				
+				key := buildGroupKey(record, keyFields)
+				
+				// Update or create group stats
+				if stats, exists := groupStats[key]; exists {
+					stats.update(record)
+				} else {
+					stats := newGroupAccumulator(record, keyFields)
+					stats.update(record)
+					groupStats[key] = stats
+				}
+				
+				processedCount++
+			}
+			
+			// Emit current group summary
+			return emitGroupSummary(groupStats, processedCount), nil
+		}
+	}
+}
+
+// groupAccumulator maintains running statistics for a group
+type groupAccumulator struct {
+	keyValues map[string]any
+	count     int64
+	numericSums map[string]float64
+}
+
+func newGroupAccumulator(firstRecord Record, keyFields []string) *groupAccumulator {
+	acc := &groupAccumulator{
+		keyValues:   make(map[string]any),
+		count:       0,
+		numericSums: make(map[string]float64),
+	}
+	
+	// Store key field values
+	for _, field := range keyFields {
+		if val, exists := firstRecord[field]; exists {
+			acc.keyValues[field] = val
+		}
+	}
+	
+	return acc
+}
+
+func (acc *groupAccumulator) update(record Record) {
+	acc.count++
+	
+	// Update numeric field sums
+	for field, value := range record {
+		if numValue, ok := convertToFloat64(value); ok {
+			acc.numericSums[field] += numValue
+		}
+	}
+}
+
+func emitGroupSummary(groupStats map[string]*groupAccumulator, totalProcessed int) Record {
+	summary := R(
+		"total_processed", totalProcessed,
+		"active_groups", len(groupStats),
+		"timestamp", time.Now().Unix(),
+	)
+	
+	// Add details about largest group
+	var largestGroup *groupAccumulator
+	var largestKey string
+	for key, stats := range groupStats {
+		if largestGroup == nil || stats.count > largestGroup.count {
+			largestGroup = stats
+			largestKey = key
+		}
+	}
+	
+	if largestGroup != nil {
+		summary.Set("largest_group_key", largestKey)
+		summary.Set("largest_group_count", largestGroup.count)
+	}
+	
+	return summary
+}
+
+// Note: convertToFloat64 function is defined in stream.go

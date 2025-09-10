@@ -27,6 +27,125 @@ type BoolStream = Stream[bool]
 type Record map[string]any
 
 // ============================================================================
+// FIELD TYPE VALIDATION SYSTEM
+// ============================================================================
+
+// allowedBaseTypes defines the permitted base types for Record fields
+var allowedBaseTypes = map[reflect.Type]bool{
+	// Integer types
+	reflect.TypeOf(int(0)):     true,
+	reflect.TypeOf(int8(0)):    true,
+	reflect.TypeOf(int16(0)):   true,
+	reflect.TypeOf(int32(0)):   true,
+	reflect.TypeOf(int64(0)):   true,
+	reflect.TypeOf(uint(0)):    true,
+	reflect.TypeOf(uint8(0)):   true,
+	reflect.TypeOf(uint16(0)):  true,
+	reflect.TypeOf(uint32(0)):  true,
+	reflect.TypeOf(uint64(0)):  true,
+	
+	// Float types
+	reflect.TypeOf(float32(0)): true,
+	reflect.TypeOf(float64(0)): true,
+	
+	// Other basic types
+	reflect.TypeOf(""):         true, // string
+	reflect.TypeOf(true):       true, // bool
+	reflect.TypeOf(time.Time{}): true, // time.Time
+}
+
+// isAllowedBaseType checks if a type is an allowed base type for Record fields
+func isAllowedBaseType(t reflect.Type) bool {
+	return allowedBaseTypes[t]
+}
+
+// isAllowedStreamType checks if a type is an allowed Stream[T] type where T is valid
+func isAllowedStreamType(t reflect.Type) bool {
+	// Must be a function type
+	if t.Kind() != reflect.Func {
+		return false
+	}
+	
+	// Must have signature: func() (T, error)
+	if t.NumIn() != 0 || t.NumOut() != 2 {
+		return false
+	}
+	
+	// Second return must be error
+	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	if !t.Out(1).Implements(errorType) {
+		return false
+	}
+	
+	// First return type T must be allowed
+	elementType := t.Out(0)
+	
+	// Check if T is a base type
+	if isAllowedBaseType(elementType) {
+		return true
+	}
+	
+	// Check if T is Record (map[string]any)
+	recordType := reflect.TypeOf(Record{})
+	if elementType == recordType {
+		return true
+	}
+	
+	return false
+}
+
+// isValidFieldType validates that a value can be stored in a Record field
+func isValidFieldType(value any) bool {
+	if value == nil {
+		return false // Explicitly reject nil
+	}
+	
+	valueType := reflect.TypeOf(value)
+	if valueType == nil {
+		return false // Handle nil interface values
+	}
+	
+	// Check base types first
+	if isAllowedBaseType(valueType) {
+		return true
+	}
+	
+	// Check Stream[T] types
+	if isAllowedStreamType(valueType) {
+		return true
+	}
+	
+	return false
+}
+
+// getFieldTypeName returns a human-readable name for field types
+func getFieldTypeName(t reflect.Type) string {
+	if t == nil {
+		return "<nil>"
+	}
+	
+	if t.Kind() == reflect.Func && isAllowedStreamType(t) {
+		elementType := t.Out(0)
+		if elementType == reflect.TypeOf(Record{}) {
+			return "Stream[Record]"
+		}
+		return fmt.Sprintf("Stream[%s]", elementType.Name())
+	}
+	return t.String()
+}
+
+// ValidateRecord checks if an existing record has valid field types
+func ValidateRecord(r Record) error {
+	for field, value := range r {
+		if !isValidFieldType(value) {
+			return fmt.Errorf("field '%s' has invalid type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+				field, getFieldTypeName(reflect.TypeOf(value)))
+		}
+	}
+	return nil
+}
+
+// ============================================================================
 // SMART RECORD SYSTEM - NATIVE GO TYPES
 // ============================================================================
 
@@ -39,21 +158,38 @@ func R(pairs ...any) Record {
 	r := make(Record)
 	for i := 0; i < len(pairs); i += 2 {
 		key := pairs[i].(string)
-		r[key] = pairs[i+1] // Direct storage - no wrapping!
+		value := pairs[i+1]
+		
+		// Validate field type
+		if !isValidFieldType(value) {
+			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+				key, getFieldTypeName(reflect.TypeOf(value))))
+		}
+		
+		r[key] = value
 	}
 	return r
 }
 
-// RecordFrom creates a Record from map[string]any
+// RecordFrom creates a Record from map[string]any with type validation
 func RecordFrom(m map[string]any) Record {
-	return Record(m) // Direct conversion - zero overhead!
+	r := make(Record)
+	for key, value := range m {
+		// Validate each field type
+		if !isValidFieldType(value) {
+			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+				key, getFieldTypeName(reflect.TypeOf(value))))
+		}
+		r[key] = value
+	}
+	return r
 }
 
-// RecordsFrom creates Records from slice of maps
+// RecordsFrom creates Records from slice of maps with type validation
 func RecordsFrom(maps []map[string]any) []Record {
 	records := make([]Record, len(maps))
 	for i, m := range maps {
-		records[i] = Record(m)
+		records[i] = RecordFrom(m) // Use RecordFrom which validates
 	}
 	return records
 }
@@ -94,6 +230,12 @@ func GetOr[T any](r Record, field string, defaultVal T) T {
 
 // Set assigns a value to a record field
 func (r Record) Set(field string, value any) Record {
+	// Validate field type
+	if !isValidFieldType(value) {
+		panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+			field, getFieldTypeName(reflect.TypeOf(value))))
+	}
+	
 	r[field] = value
 	return r
 }
@@ -330,5 +472,18 @@ func Range(start, end, step int64) IntStream {
 		value := current
 		current += step
 		return value, nil
+	}
+}
+
+// Once creates a stream with a single element
+func Once[T any](item T) Stream[T] {
+	consumed := false
+	return func() (T, error) {
+		if consumed {
+			var zero T
+			return zero, EOS
+		}
+		consumed = true
+		return item, nil
 	}
 }

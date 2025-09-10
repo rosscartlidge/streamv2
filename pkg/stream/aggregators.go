@@ -47,6 +47,11 @@ func Min[T Comparable](stream Stream[T]) (T, error) {
 	return RunAggregator(stream, MinAggregator[T, T](func(val T) T { return val }))
 }
 
+// Avg calculates average of numeric values
+func Avg[T Numeric](stream Stream[T]) (float64, error) {
+	return RunAggregator(stream, AvgAggregator[T, T](func(val T) T { return val }))
+}
+
 // ============================================================================
 // STREAM COLLECTION AND PROCESSING
 // ============================================================================
