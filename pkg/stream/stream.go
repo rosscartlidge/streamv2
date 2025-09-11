@@ -91,6 +91,12 @@ func isAllowedStreamType(t reflect.Type) bool {
 		return true
 	}
 	
+	// Check if T is any (interface{}) for flexible JSON arrays
+	anyType := reflect.TypeOf((*any)(nil)).Elem()
+	if elementType == anyType {
+		return true
+	}
+	
 	return false
 }
 
@@ -115,6 +121,12 @@ func isValidFieldType(value any) bool {
 		return true
 	}
 	
+	// Check if it's a Record type (for nested structures)
+	recordType := reflect.TypeOf(Record{})
+	if valueType == recordType {
+		return true
+	}
+	
 	return false
 }
 
@@ -129,6 +141,9 @@ func getFieldTypeName(t reflect.Type) string {
 		if elementType == reflect.TypeOf(Record{}) {
 			return "Stream[Record]"
 		}
+		if elementType == reflect.TypeOf((*any)(nil)).Elem() {
+			return "Stream[any]"
+		}
 		return fmt.Sprintf("Stream[%s]", elementType.Name())
 	}
 	return t.String()
@@ -138,7 +153,7 @@ func getFieldTypeName(t reflect.Type) string {
 func ValidateRecord(r Record) error {
 	for field, value := range r {
 		if !isValidFieldType(value) {
-			return fmt.Errorf("field '%s' has invalid type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+			return fmt.Errorf("field '%s' has invalid type %s. Allowed: int variants, float variants, string, bool, time.Time, Record, Stream[T] where T is allowed", 
 				field, getFieldTypeName(reflect.TypeOf(value)))
 		}
 	}
@@ -162,7 +177,7 @@ func R(pairs ...any) Record {
 		
 		// Validate field type
 		if !isValidFieldType(value) {
-			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Record, Stream[T] where T is allowed", 
 				key, getFieldTypeName(reflect.TypeOf(value))))
 		}
 		
@@ -177,7 +192,7 @@ func RecordFrom(m map[string]any) Record {
 	for key, value := range m {
 		// Validate each field type
 		if !isValidFieldType(value) {
-			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Stream[T] where T is allowed", 
+			panic(fmt.Sprintf("Field '%s' has unsupported type %s. Allowed: int variants, float variants, string, bool, time.Time, Record, Stream[T] where T is allowed", 
 				key, getFieldTypeName(reflect.TypeOf(value))))
 		}
 		r[key] = value
