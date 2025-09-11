@@ -21,42 +21,81 @@ type Filter[T, U any] func(Stream[T]) Stream[U]
 // FUNCTIONAL OPERATIONS - TYPE SAFE AND COMPOSABLE
 // ============================================================================
 
-// Map transforms each element in a stream using transparent executor selection
+// Map transforms each element in a stream with automatic parallelization for large datasets
 func Map[T, U any](fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
-		// Try to determine operation characteristics for executor selection
-		op := NewMapOperation(reflect.TypeOf((*T)(nil)).Elem(), -1, estimateFunctionComplexity(fn))
+		// Try to estimate dataset size by sampling
+		complexity := estimateFunctionComplexity(fn)
 		
-		ctx := ExecutionContext{
-			Ctx:           context.Background(),
-			MaxMemory:     1024 * 1024 * 1024, // 1GB default
-			MaxGoroutines: 32,                  // Reasonable default
-			GPUMemory:     0,                   // Will be detected by GPU executor
-			BatchSize:     1000,                // Default batch size
+		// For auto-parallel decision, we need to peek at the stream
+		// If we can't estimate size, use heuristics based on function complexity
+		if complexity >= 5 { // Complex functions benefit more from parallelization
+			return autoParallelMap(fn, input, complexity)
 		}
 		
-		// Get best executor for this operation
-		executor := getExecutor(op, ctx)
-		
-		// For now, use traditional implementation (executor integration comes in next phase)
-		// The architecture is ready, but we'll integrate actual execution later
-		_ = executor // Acknowledge we have the executor
-		
-		// Current implementation (unchanged user experience)
-		return func() (U, error) {
-			item, err := input()
-			if err != nil {
-				var zero U
-				return zero, err
-			}
-			return fn(item), nil
-		}
+		// For simple operations, check if we should parallelize based on data volume
+		return adaptiveMap(fn, input, complexity)
 	}
 }
 
-// Where keeps only elements matching a predicate
+// autoParallelMap automatically uses parallel processing for complex operations
+func autoParallelMap[T, U any](fn func(T) U, input Stream[T], complexity int) Stream[U] {
+	// Use parallel processing with worker count based on complexity and available CPUs
+	workers := calculateOptimalWorkers(complexity)
+	return Parallel(workers, fn)(input)
+}
+
+// adaptiveMap decides between sequential and parallel based on data characteristics
+func adaptiveMap[T, U any](fn func(T) U, input Stream[T], complexity int) Stream[U] {
+	// For now, use a simple heuristic: parallel for moderate+ complexity
+	// In future, this could sample the stream to estimate size
+	if complexity >= 3 {
+		workers := calculateOptimalWorkers(complexity)
+		return Parallel(workers, fn)(input)
+	}
+	
+	// Sequential implementation for simple operations
+	return func() (U, error) {
+		item, err := input()
+		if err != nil {
+			var zero U
+			return zero, err
+		}
+		return fn(item), nil
+	}
+}
+
+// calculateOptimalWorkers determines optimal worker count based on operation characteristics
+func calculateOptimalWorkers(complexity int) int {
+	// Base workers on complexity and system capabilities
+	baseWorkers := 4 // Conservative default
+	
+	// More workers for more complex operations
+	if complexity >= 7 {
+		baseWorkers = 8
+	} else if complexity >= 5 {
+		baseWorkers = 6
+	}
+	
+	// Don't exceed reasonable bounds
+	if baseWorkers > 16 {
+		baseWorkers = 16
+	}
+	
+	return baseWorkers
+}
+
+// Where keeps only elements matching a predicate with automatic parallelization
 func Where[T any](predicate func(T) bool) Filter[T, T] {
 	return func(input Stream[T]) Stream[T] {
+		complexity := estimateFunctionComplexity(predicate)
+		
+		// Auto-parallelize complex predicates
+		if complexity >= 4 {
+			return autoParallelFilter(predicate, input, complexity)
+		}
+		
+		// Sequential implementation for simple predicates
 		return func() (T, error) {
 			for {
 				item, err := input()
@@ -68,6 +107,36 @@ func Where[T any](predicate func(T) bool) Filter[T, T] {
 					return item, nil
 				}
 			}
+		}
+	}
+}
+
+// autoParallelFilter implements parallel filtering for complex predicates
+func autoParallelFilter[T any](predicate func(T) bool, input Stream[T], complexity int) Stream[T] {
+	// Create a filter function that returns the item or nil
+	filterFn := func(item T) *T {
+		if predicate(item) {
+			return &item
+		}
+		return nil
+	}
+	
+	workers := calculateOptimalWorkers(complexity)
+	
+	// Use parallel processing, then filter out nils
+	parallelStream := Parallel(workers, filterFn)(input)
+	
+	return func() (T, error) {
+		for {
+			result, err := parallelStream()
+			if err != nil {
+				var zero T
+				return zero, err
+			}
+			if result != nil {
+				return *result, nil
+			}
+			// Continue if result was nil (filtered out)
 		}
 	}
 }

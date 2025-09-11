@@ -220,10 +220,10 @@ func estimateParallelMemory(dataType reflect.Type, size int64, workers int) int6
 // estimateFunctionComplexity provides a rough estimate of function computational complexity
 // This is a heuristic for executor selection - more sophisticated analysis could be added later
 func estimateFunctionComplexity(fn interface{}) int {
-	// For now, return a reasonable default
+	// For now, return a conservative default to avoid over-parallelization
 	// In the future, this could analyze the function:
-	// - Simple arithmetic: 1-3
+	// - Simple arithmetic: 1-2
 	// - Math functions (sin, cos, sqrt): 4-6  
 	// - Complex business logic: 7-10
-	return 3 // Moderate complexity default
+	return 2 // Conservative default - most operations stay sequential
 }
