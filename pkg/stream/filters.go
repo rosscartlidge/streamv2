@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	
+	"golang.org/x/sync/errgroup"
 )
 
 // ============================================================================
@@ -158,75 +160,73 @@ func ExtractField[T any](field string) Filter[Record, T] {
 // CONCURRENT PROCESSING
 // ============================================================================
 
-// Parallel processes elements concurrently with proper goroutine lifecycle management
+// Parallel processes elements concurrently using errgroup for proper lifecycle management
 func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
 		ctx, cancel := context.WithCancel(context.Background())
+		g, gctx := errgroup.WithContext(ctx)
+		
 		inputCh := make(chan T, workers)
 		outputCh := make(chan U, workers)
-		var wg sync.WaitGroup
 
-		// Start workers with proper cancellation
+		// Start workers using errgroup
 		for i := 0; i < workers; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			g.Go(func() error {
 				for {
 					select {
-					case <-ctx.Done():
-						return // Clean termination
+					case <-gctx.Done():
+						return gctx.Err()
 					case item, ok := <-inputCh:
 						if !ok {
-							return // Input closed
+							return nil // Input closed normally
 						}
 						// Process item with cancellation check
 						result := fn(item)
 						select {
 						case outputCh <- result:
-						case <-ctx.Done():
-							return // Avoid blocking on output
+						case <-gctx.Done():
+							return gctx.Err()
 						}
 					}
 				}
-			}()
+			})
 		}
 
-		// Feed input with cancellation support
-		go func() {
+		// Feed input with errgroup
+		g.Go(func() error {
 			defer close(inputCh)
-			defer func() {
-				// Wait for workers to finish, then close output
-				go func() {
-					wg.Wait()
-					close(outputCh)
-				}()
-			}()
-
+			
 			for {
 				select {
-				case <-ctx.Done():
-					return
+				case <-gctx.Done():
+					return gctx.Err()
 				default:
 					item, err := input()
 					if err != nil {
-						return // Input stream ended
+						return nil // Input stream ended normally
 					}
 					select {
 					case inputCh <- item:
-					case <-ctx.Done():
-						return
+					case <-gctx.Done():
+						return gctx.Err()
 					}
 				}
 			}
+		})
+
+		// Cleanup goroutine 
+		go func() {
+			g.Wait() // Wait for all goroutines to finish
+			close(outputCh)
 		}()
 
 		// Return cancellable stream
 		return func() (U, error) {
 			select {
-			case <-ctx.Done():
+			case <-gctx.Done():
 				cancel() // Ensure cleanup
 				var zero U
-				return zero, ctx.Err()
+				return zero, gctx.Err()
 			case item, ok := <-outputCh:
 				if !ok {
 					cancel() // Cleanup when stream ends
