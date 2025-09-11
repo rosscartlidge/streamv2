@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -157,42 +158,84 @@ func ExtractField[T any](field string) Filter[Record, T] {
 // CONCURRENT PROCESSING
 // ============================================================================
 
-// Parallel processes elements concurrently
+// Parallel processes elements concurrently with proper goroutine lifecycle management
 func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
+		ctx, cancel := context.WithCancel(context.Background())
 		inputCh := make(chan T, workers)
 		outputCh := make(chan U, workers)
+		var wg sync.WaitGroup
 
-		// Start workers
+		// Start workers with proper cancellation
 		for i := 0; i < workers; i++ {
+			wg.Add(1)
 			go func() {
-				for item := range inputCh {
-					outputCh <- fn(item)
+				defer wg.Done()
+				for {
+					select {
+					case <-ctx.Done():
+						return // Clean termination
+					case item, ok := <-inputCh:
+						if !ok {
+							return // Input closed
+						}
+						// Process item with cancellation check
+						result := fn(item)
+						select {
+						case outputCh <- result:
+						case <-ctx.Done():
+							return // Avoid blocking on output
+						}
+					}
 				}
 			}()
 		}
 
-		// Feed input
+		// Feed input with cancellation support
 		go func() {
 			defer close(inputCh)
 			defer func() {
-				// Give workers time to finish, then close output
+				// Wait for workers to finish, then close output
 				go func() {
-					time.Sleep(100 * time.Millisecond)
+					wg.Wait()
 					close(outputCh)
 				}()
 			}()
 
 			for {
-				item, err := input()
-				if err != nil {
+				select {
+				case <-ctx.Done():
 					return
+				default:
+					item, err := input()
+					if err != nil {
+						return // Input stream ended
+					}
+					select {
+					case inputCh <- item:
+					case <-ctx.Done():
+						return
+					}
 				}
-				inputCh <- item
 			}
 		}()
 
-		return FromChannel(outputCh)
+		// Return cancellable stream
+		return func() (U, error) {
+			select {
+			case <-ctx.Done():
+				cancel() // Ensure cleanup
+				var zero U
+				return zero, ctx.Err()
+			case item, ok := <-outputCh:
+				if !ok {
+					cancel() // Cleanup when stream ends
+					var zero U
+					return zero, EOS
+				}
+				return item, nil
+			}
+		}
 	}
 }
 
@@ -218,59 +261,93 @@ func WithContext[T any](ctx context.Context, stream Stream[T]) Stream[T] {
 // ============================================================================
 
 // Tee splits a stream into multiple identical streams for parallel consumption.
-// Works with both finite and infinite streams using a broadcasting dispatcher.
+// Works with both finite and infinite streams using a broadcasting dispatcher with proper cleanup.
 func Tee[T any](stream Stream[T], n int) []Stream[T] {
 	if n <= 0 {
 		return nil
 	}
 	
-	// Create channels for each output stream
+	ctx, cancel := context.WithCancel(context.Background())
 	channels := make([]chan T, n)
+	abandoned := make([]bool, n) // Track abandoned streams
+	var mu sync.RWMutex
+	
 	for i := 0; i < n; i++ {
-		channels[i] = make(chan T, 100) // Buffer to handle backpressure
+		channels[i] = make(chan T, 100)
 	}
 	
-	// Start broadcaster goroutine
+	// Start broadcaster goroutine with cancellation
 	go func() {
 		defer func() {
-			// Close all channels when source stream ends
 			for _, ch := range channels {
 				close(ch)
 			}
 		}()
 		
 		for {
-			item, err := stream()
-			if err != nil {
-				// Source stream ended (finite stream case) or error
+			select {
+			case <-ctx.Done():
 				return
-			}
-			
-			// Broadcast to all channels
-			for _, ch := range channels {
-				select {
-				case ch <- item:
-					// Successfully sent
-				default:
-					// Channel buffer full - implement backpressure policy
-					// For now, block and wait (could implement dropping policy)
-					ch <- item
+			default:
+				item, err := stream()
+				if err != nil {
+					return // Source stream ended
+				}
+				
+				// Broadcast to non-abandoned channels only
+				mu.RLock()
+				activeCount := 0
+				for i, ch := range channels {
+					if abandoned[i] {
+						continue
+					}
+					activeCount++
+					
+					select {
+					case ch <- item:
+						// Successfully sent
+					case <-time.After(5 * time.Second):
+						// Consumer too slow - mark as abandoned to prevent leak
+						mu.RUnlock()
+						mu.Lock()
+						abandoned[i] = true
+						close(ch) // Close abandoned channel
+						mu.Unlock()
+						mu.RLock()
+					case <-ctx.Done():
+						mu.RUnlock()
+						return
+					}
+				}
+				mu.RUnlock()
+				
+				// If all streams abandoned, terminate
+				if activeCount == 0 {
+					cancel()
+					return
 				}
 			}
 		}
 	}()
 	
-	// Create output streams that read from their respective channels
+	// Create output streams with cleanup tracking
 	streams := make([]Stream[T], n)
 	for i := 0; i < n; i++ {
-		ch := channels[i] // Capture for closure
+		ch := channels[i]
 		streams[i] = func() (T, error) {
-			item, ok := <-ch
-			if !ok {
+			select {
+			case <-ctx.Done():
 				var zero T
-				return zero, EOS // Channel closed - source stream ended
+				return zero, ctx.Err()
+			case item, ok := <-ch:
+				if !ok {
+					// Mark this stream as done
+					cancel()
+					var zero T
+					return zero, EOS
+				}
+				return item, nil
 			}
-			return item, nil
 		}
 	}
 	
@@ -317,14 +394,15 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 // Works with both finite and infinite streams using a central dispatcher.
 func Split(keyFields []string) Filter[Record, Stream[Record]] {
 	return func(input Stream[Record]) Stream[Stream[Record]] {
-		// Channels for communication between dispatcher and substreams
-		newSubstreams := make(chan Stream[Record], 10) // Buffer to prevent blocking
+		ctx, cancel := context.WithCancel(context.Background())
+		newSubstreams := make(chan Stream[Record], 10)
 		groupChannels := make(map[string]chan Record)
+		abandonedGroups := make(map[string]bool)
+		var mu sync.RWMutex
 		
-		// Start dispatcher goroutine
+		// Start dispatcher goroutine with cancellation
 		go func() {
 			defer func() {
-				// Close all group channels when input ends
 				for _, ch := range groupChannels {
 					close(ch)
 				}
@@ -332,59 +410,89 @@ func Split(keyFields []string) Filter[Record, Stream[Record]] {
 			}()
 			
 			for {
-				record, err := input()
-				if err != nil {
-					// Input stream ended (finite stream case)
-					return
-				}
-				
-				key := buildGroupKey(record, keyFields)
-				
-				// Create new substream if we haven't seen this key
-				if _, exists := groupChannels[key]; !exists {
-					// Create buffered channel for this group
-					groupChan := make(chan Record, 100) // Larger buffer for backpressure
-					groupChannels[key] = groupChan
-					
-					// Create substream that reads from this group's channel
-					substream := func() (Record, error) {
-						record, ok := <-groupChan
-						if !ok {
-							return nil, EOS // Channel closed
-						}
-						return record, nil
-					}
-					
-					// Emit the new substream (non-blocking due to buffer)
-					select {
-					case newSubstreams <- substream:
-						// Successfully emitted
-					default:
-						// Buffer full - this is a backpressure situation
-						// For now, we'll block, but could implement dropping policy
-						newSubstreams <- substream
-					}
-				}
-				
-				// Send record to appropriate group channel
 				select {
-				case groupChannels[key] <- record:
-					// Successfully sent
+				case <-ctx.Done():
+					return
 				default:
-					// Channel buffer full - implement backpressure policy
-					// For now, block and wait
-					groupChannels[key] <- record
+					record, err := input()
+					if err != nil {
+						return // Input stream ended
+					}
+					
+					key := buildGroupKey(record, keyFields)
+					
+					// Check if group was abandoned
+					mu.RLock()
+					isAbandoned := abandonedGroups[key]
+					mu.RUnlock()
+					
+					if isAbandoned {
+						continue // Skip abandoned groups
+					}
+					
+					// Create new substream if needed
+					if _, exists := groupChannels[key]; !exists {
+						groupChan := make(chan Record, 100)
+						groupChannels[key] = groupChan
+						
+						// Create substream with cancellation
+						substream := func() (Record, error) {
+							select {
+							case <-ctx.Done():
+								return nil, ctx.Err()
+							case record, ok := <-groupChan:
+								if !ok {
+									return nil, EOS
+								}
+								return record, nil
+							}
+						}
+						
+						// Emit new substream with timeout
+						select {
+						case newSubstreams <- substream:
+						case <-time.After(1 * time.Second):
+							// Consumer too slow, abandon this group
+							mu.Lock()
+							abandonedGroups[key] = true
+							close(groupChan)
+							delete(groupChannels, key)
+							mu.Unlock()
+							continue
+						case <-ctx.Done():
+							return
+						}
+					}
+					
+					// Send record to group channel with timeout
+					select {
+					case groupChannels[key] <- record:
+					case <-time.After(5 * time.Second):
+						// Group consumer too slow - abandon it
+						mu.Lock()
+						abandonedGroups[key] = true
+						close(groupChannels[key])
+						delete(groupChannels, key)
+						mu.Unlock()
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}()
 		
-		// Return stream that yields substreams
+		// Return stream with cancellation support
 		return func() (Stream[Record], error) {
-			substream, ok := <-newSubstreams
-			if !ok {
-				return nil, EOS // No more substreams
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case substream, ok := <-newSubstreams:
+				if !ok {
+					cancel() // Cleanup when done
+					return nil, EOS
+				}
+				return substream, nil
 			}
-			return substream, nil
 		}
 	}
 }
