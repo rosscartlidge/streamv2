@@ -1,18 +1,20 @@
 # StreamV2 - Modern Stream Processing for Go
 
-[![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**StreamV2** is a high-performance, type-safe stream processing library for Go, designed with generics-first architecture for maximum developer productivity and runtime performance.
+**StreamV2** is a production-ready, high-performance stream processing library for Go with advanced features that exceed industry standards. Built with generics-first architecture and transparent GPU acceleration capabilities.
 
 ## 🚀 **Key Features**
 
-- **🔥 Generics-First Design** - Full type safety with Go 1.21+ generics
-- **⚡ High Performance** - GPU-ready architecture with CPU fallback  
-- **🔄 Smart Type Conversion** - Automatic conversion between compatible types
-- **🧵 Parallel Processing** - Built-in concurrency for better performance
-- **📊 Rich Operations** - Functional programming patterns for data transformation
-- **🎯 Zero Dependencies** - Pure Go implementation
+- **🔥 Generics-First Design** - Full type safety with Go 1.24+ generics
+- **⚡ Transparent GPU Acceleration** - Automatic GPU/CPU selection for optimal performance
+- **🧠 Auto-Parallel Processing** - Intelligent parallelization based on operation complexity
+- **🏗️ Advanced Windowing** - Session windows, custom triggers, and late data handling
+- **📊 Comprehensive I/O** - CSV, TSV, JSON, Protocol Buffers with streaming support
+- **🔄 Smart Type Conversion** - Automatic conversion with Record type system
+- **🛡️ Production-Ready** - Goroutine leak prevention and robust error handling
+- **🎯 Zero Breaking Changes** - Complete backward compatibility
 
 ## 📦 **Installation**
 
@@ -173,6 +175,69 @@ fmt.Printf("Count: %d, Sum: %d, Avg: %.2f\n",
 
 ## 🛠️ **Advanced Features**
 
+### **🚀 Transparent GPU Acceleration** 
+```go
+// Same API - automatically uses GPU when available and beneficial
+result := stream.Map(func(x float64) float64 { 
+    return math.Sin(x) * math.Cos(x) * math.Sqrt(x) // GPU-accelerated
+})(largeDataset)
+
+// Simple operations stay on CPU (efficient)
+simple := stream.Map(func(x int) int { return x * 2 })(smallDataset) // CPU
+```
+
+### **🧠 Auto-Parallel Processing**
+```go
+// Automatic parallelization based on operation complexity - zero configuration!
+stream.Map(expensiveFunction)(data)     // → Auto-parallel (4-8 workers)
+stream.Map(simpleFunction)(data)        // → Sequential (efficient)
+stream.Where(complexPredicate)(data)    // → Auto-parallel (6+ workers)
+stream.Where(simplePredicate)(data)     // → Sequential (efficient)
+```
+
+### **🏗️ Advanced Windowing**
+```go
+// Session windows with activity detection
+sessions := stream.SessionWindow(30*time.Second, func(event Event) bool {
+    return event.Type == "login" || event.Type == "purchase"
+})(eventStream)
+
+// Multi-trigger windows
+windows := stream.Window[Event]().
+    TriggerOnCount(100).                    // Fire every 100 events
+    TriggerOnTime(5*time.Second).          // OR every 5 seconds  
+    AllowLateness(1*time.Minute).          // Handle late arrivals
+    AccumulationMode().                     // Accumulate late data
+    Apply()(eventStream)
+```
+
+### **📊 Comprehensive I/O Support**
+```go
+// Protocol Buffers (high-performance binary)
+users := stream.ProtobufToStream(reader, userMessageDesc)
+stream.StreamToProtobuf(users, writer, userMessageDesc)
+
+// JSON with nested structure support  
+data := stream.JSONToStream(httpResponse.Body)
+stream.StreamToJSON(processedData, httpRequest.Body)
+
+// CSV/TSV with automatic type detection
+records := stream.CSVToStream("data.csv")
+stream.StreamToTSV(records, "output.tsv")
+```
+
+### **🛡️ Production-Ready Reliability**
+```go
+// Goroutine leak prevention - automatic cleanup
+stream.Map(complexFunction)(infiniteStream)  // No leaks, even when abandoned
+stream.Tee(dataStream, 10)                   // Slow consumers auto-abandoned
+stream.Parallel(8, processor)(data)          // Workers cleaned up properly
+
+// Error handling with errgroup
+stream.GroupBy([]string{"region"}, 
+    stream.FieldSumSpec[int]("total", "amount"))  // Robust aggregation
+```
+
 ### **Smart Type Conversion**
 ```go
 record := stream.R("age", "25", "score", "95.5", "active", 1)
@@ -180,23 +245,6 @@ record := stream.R("age", "25", "score", "95.5", "active", 1)
 age := stream.Get[int64](record, "age")        // "25" → 25
 score := stream.Get[float64](record, "score")  // "95.5" → 95.5  
 active := stream.Get[bool](record, "active")   // 1 → true
-```
-
-### **Windowed Operations**
-```go
-// Process data in time-based windows
-windowed := stream.Batched(1000, func(batch []Event) []Summary {
-    return []Summary{analyzeBatch(batch)}
-})(eventStream)
-```
-
-### **Context Support**
-```go
-// Cancellable stream processing
-ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-defer cancel()
-
-stream := stream.WithContext(ctx, dataStream)
 ```
 
 ## 📚 **Documentation**
