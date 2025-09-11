@@ -21,9 +21,28 @@ type Filter[T, U any] func(Stream[T]) Stream[U]
 // FUNCTIONAL OPERATIONS - TYPE SAFE AND COMPOSABLE
 // ============================================================================
 
-// Map transforms each element in a stream
+// Map transforms each element in a stream using transparent executor selection
 func Map[T, U any](fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
+		// Try to determine operation characteristics for executor selection
+		op := NewMapOperation(reflect.TypeOf((*T)(nil)).Elem(), -1, estimateFunctionComplexity(fn))
+		
+		ctx := ExecutionContext{
+			Ctx:           context.Background(),
+			MaxMemory:     1024 * 1024 * 1024, // 1GB default
+			MaxGoroutines: 32,                  // Reasonable default
+			GPUMemory:     0,                   // Will be detected by GPU executor
+			BatchSize:     1000,                // Default batch size
+		}
+		
+		// Get best executor for this operation
+		executor := getExecutor(op, ctx)
+		
+		// For now, use traditional implementation (executor integration comes in next phase)
+		// The architecture is ready, but we'll integrate actual execution later
+		_ = executor // Acknowledge we have the executor
+		
+		// Current implementation (unchanged user experience)
 		return func() (U, error) {
 			item, err := input()
 			if err != nil {
