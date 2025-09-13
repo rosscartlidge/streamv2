@@ -260,3 +260,95 @@ func TestStringParsing(t *testing.T) {
 		}
 	})
 }
+
+// TestFloatStringParsing tests the string parsing functionality in convertToFloat64
+func TestFloatStringParsing(t *testing.T) {
+	t.Run("ValidFloatStrings", func(t *testing.T) {
+		record := NewRecord().
+			String("string_pi", "3.14159").
+			String("string_negative", "-2.5").
+			String("string_zero", "0.0").
+			String("string_integer", "42").
+			String("string_scientific", "1.23e-4").
+			String("string_large_exp", "1.5E+10").
+			Build()
+		
+		// Test pi parsing
+		parsed := GetOr(record, "string_pi", 999.0)
+		if parsed != 3.14159 {
+			t.Errorf("Expected 3.14159, got %f", parsed)
+		}
+		
+		// Test negative number parsing
+		parsed = GetOr(record, "string_negative", 999.0)
+		if parsed != -2.5 {
+			t.Errorf("Expected -2.5, got %f", parsed)
+		}
+		
+		// Test zero parsing
+		parsed = GetOr(record, "string_zero", 999.0)
+		if parsed != 0.0 {
+			t.Errorf("Expected 0.0, got %f", parsed)
+		}
+		
+		// Test integer as float parsing
+		parsed = GetOr(record, "string_integer", 999.0)
+		if parsed != 42.0 {
+			t.Errorf("Expected 42.0, got %f", parsed)
+		}
+		
+		// Test scientific notation (small)
+		parsed = GetOr(record, "string_scientific", 999.0)
+		expected := 0.000123
+		if abs(parsed-expected) > 1e-9 {
+			t.Errorf("Expected %e, got %e", expected, parsed)
+		}
+		
+		// Test scientific notation (large)
+		parsed = GetOr(record, "string_large_exp", 999.0)
+		if parsed != 1.5e+10 {
+			t.Errorf("Expected 1.5e+10, got %e", parsed)
+		}
+	})
+	
+	t.Run("InvalidFloatStrings", func(t *testing.T) {
+		record := NewRecord().
+			String("invalid_letters", "abc").
+			String("invalid_mixed", "12.3abc").
+			String("invalid_empty", "").
+			String("invalid_multiple_dots", "1.2.3").
+			Build()
+		
+		// Test invalid letter string - should return default
+		parsed := GetOr(record, "invalid_letters", 999.0)
+		if parsed != 999.0 {
+			t.Errorf("Expected default 999.0, got %f", parsed)
+		}
+		
+		// Test invalid mixed string - should return default
+		parsed = GetOr(record, "invalid_mixed", 888.0)
+		if parsed != 888.0 {
+			t.Errorf("Expected default 888.0, got %f", parsed)
+		}
+		
+		// Test empty string - should return default
+		parsed = GetOr(record, "invalid_empty", 777.0)
+		if parsed != 777.0 {
+			t.Errorf("Expected default 777.0, got %f", parsed)
+		}
+		
+		// Test multiple dots - should return default
+		parsed = GetOr(record, "invalid_multiple_dots", 666.0)
+		if parsed != 666.0 {
+			t.Errorf("Expected default 666.0, got %f", parsed)
+		}
+	})
+}
+
+// Helper function for float comparison
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

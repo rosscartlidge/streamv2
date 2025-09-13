@@ -313,6 +313,11 @@ func convertToFloat64(val any) (float64, bool) {
 		return float64(v), true
 	case uint8:
 		return float64(v), true
+	case string:
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+			return parsed, true
+		}
+		return 0, false
 	default:
 		return 0, false
 	}
