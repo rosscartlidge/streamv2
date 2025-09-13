@@ -114,18 +114,18 @@ func main() {
 	fmt.Println("----------------------------------")
 	
 	// Show that Records can contain all the types protobuf would create
-	mockProtobufRecord := stream.R(
-		"id", int64(12345),
-		"name", "Alice Smith",
-		"active", true,
-		"score", 95.5,
-		"tags", stream.FromSlice([]any{"golang", "protobuf", "streaming"}),
-		"profile", stream.R(
-			"department", "Engineering",
-			"level", "Senior",
-			"salary", 125000.0,
-		),
-	)
+	mockProtobufRecord := stream.NewRecord().
+		Int("id", 12345).
+		String("name", "Alice Smith").
+		Bool("active", true).
+		Float("score", 95.5).
+		Set("tags", stream.FromSliceAny([]any{"golang", "protobuf", "streaming"})).
+		Set("profile", stream.NewRecord().
+			String("department", "Engineering").
+			String("level", "Senior").
+			Float("salary", 125000.0).
+			Build()).
+		Build()
 	
 	fmt.Printf("✅ Created mock protobuf-style Record with %d fields\n", len(mockProtobufRecord))
 	fmt.Printf("ID: %d\n", stream.GetOr(mockProtobufRecord, "id", int64(0)))

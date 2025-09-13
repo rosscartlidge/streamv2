@@ -12,12 +12,12 @@ func main() {
 	fmt.Println("=================================")
 
 	// Create test data
-	users := stream.FromRecords([]stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", int64(95000)),
-		stream.R("name", "Bob", "department", "engineering", "salary", int64(87000)),
-		stream.R("name", "Charlie", "department", "sales", "salary", int64(92000)),
-		stream.R("name", "Diana", "department", "sales", "salary", int64(88000)),
-		stream.R("name", "Eve", "department", "engineering", "salary", int64(91000)),
+	users, _ := stream.FromRecords([]stream.Record{
+		stream.NewRecord().String("name", "Alice").String("department", "engineering").Int("salary", 95000).Build(),
+		stream.NewRecord().String("name", "Bob").String("department", "engineering").Int("salary", 87000).Build(),
+		stream.NewRecord().String("name", "Charlie").String("department", "sales").Int("salary", 92000).Build(),
+		stream.NewRecord().String("name", "Diana").String("department", "sales").Int("salary", 88000).Build(),
+		stream.NewRecord().String("name", "Eve").String("department", "engineering").Int("salary", 91000).Build(),
 	})
 
 	fmt.Println("\n📊 Basic GroupBy (count only):")
@@ -31,12 +31,12 @@ func main() {
 	}
 
 	// Reset data for next test
-	users = stream.FromRecords([]stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", int64(95000)),
-		stream.R("name", "Bob", "department", "engineering", "salary", int64(87000)),
-		stream.R("name", "Charlie", "department", "sales", "salary", int64(92000)),
-		stream.R("name", "Diana", "department", "sales", "salary", int64(88000)),
-		stream.R("name", "Eve", "department", "engineering", "salary", int64(91000)),
+	users, _ = stream.FromRecords([]stream.Record{
+		stream.NewRecord().String("name", "Alice").String("department", "engineering").Int("salary", 95000).Build(),
+		stream.NewRecord().String("name", "Bob").String("department", "engineering").Int("salary", 87000).Build(),
+		stream.NewRecord().String("name", "Charlie").String("department", "sales").Int("salary", 92000).Build(),
+		stream.NewRecord().String("name", "Diana").String("department", "sales").Int("salary", 88000).Build(),
+		stream.NewRecord().String("name", "Eve").String("department", "engineering").Int("salary", 91000).Build(),
 	})
 
 	fmt.Println("\n💰 GroupBy with Salary Aggregations:")

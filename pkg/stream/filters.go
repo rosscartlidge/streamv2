@@ -2,8 +2,6 @@ package stream
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 	"sync"
 	"time"
 	
@@ -212,11 +210,6 @@ func Select(fields ...string) Filter[Record, Record] {
 		result := make(Record)
 		for _, field := range fields {
 			if val, exists := r[field]; exists {
-				// Since we're copying from a valid Record, the fields should be valid
-				// But let's validate to be safe
-				if !isValidFieldType(val) {
-					panic(fmt.Sprintf("Selected field '%s' has invalid type %s", field, getFieldTypeName(reflect.TypeOf(val))))
-				}
 				result[field] = val
 			}
 		}
@@ -227,12 +220,7 @@ func Select(fields ...string) Filter[Record, Record] {
 // Update modifies records
 func Update(fn func(Record) Record) Filter[Record, Record] {
 	return Map(func(r Record) Record {
-		result := fn(r)
-		// Validate the result to ensure user function returned valid Record
-		if err := ValidateRecord(result); err != nil {
-			panic(fmt.Sprintf("Update function returned invalid Record: %v", err))
-		}
-		return result
+		return fn(r)
 	})
 }
 
@@ -617,7 +605,7 @@ func CountWindow[T any](windowSize int) Filter[T, Stream[T]] {
 			}
 			
 			// Convert batch to stream
-			return FromSlice(batch), nil
+			return FromSliceAny(batch), nil
 		}
 	}
 }
@@ -653,7 +641,7 @@ func TimeWindow[T any](duration time.Duration) Filter[T, Stream[T]] {
 							return nil, err
 						}
 						// Return partial batch
-						return FromSlice(batch), nil
+						return FromSliceAny(batch), nil
 					}
 					batch = append(batch, item)
 					
@@ -675,7 +663,7 @@ func TimeWindow[T any](duration time.Duration) Filter[T, Stream[T]] {
 				batch = append(batch, item)
 			}
 			
-			return FromSlice(batch), nil
+			return FromSliceAny(batch), nil
 		}
 	}
 }
@@ -721,7 +709,7 @@ func SlidingCountWindow[T any](windowSize, stepSize int) Filter[T, Stream[T]] {
 				buffer = buffer[:len(buffer)-stepSize]
 			}
 			
-			return FromSlice(window), nil
+			return FromSliceAny(window), nil
 		}
 	}
 }
@@ -847,13 +835,13 @@ func StreamingStats[T Numeric]() Filter[T, Record] {
 					return nil, err
 				}
 				// Return final stats
-				return R(
-					"count", count,
-					"sum", sum,
-					"avg", float64(sum)/float64(count),
-					"min", currentMin,
-					"max", currentMax,
-				), err
+				return NewRecord().
+					Int("count", count).
+					Set("sum", sum).
+					Set("avg", float64(sum)/float64(count)).
+					Set("min", currentMin).
+					Set("max", currentMax).
+					Build(), err
 			}
 			
 			// Update statistics
@@ -874,13 +862,13 @@ func StreamingStats[T Numeric]() Filter[T, Record] {
 			}
 			
 			// Return current stats
-			return R(
-				"count", count,
-				"sum", sum,
-				"avg", float64(sum)/float64(count),
-				"min", currentMin,
-				"max", currentMax,
-			), nil
+			return NewRecord().
+				Int("count", count).
+				Set("sum", sum).
+				Set("avg", float64(sum)/float64(count)).
+				Set("min", currentMin).
+				Set("max", currentMax).
+				Build(), nil
 		}
 	}
 }
@@ -966,14 +954,14 @@ func TriggeredWindow[T any](trigger Trigger[T]) Filter[T, Stream[T]] {
 						return nil, err
 					}
 					// Return partial batch
-					return FromSlice(batch), nil
+					return FromSliceAny(batch), nil
 				}
 				
 				batch = append(batch, item)
 				
 				if trigger.ShouldFire(item, triggerState) {
 					// Fire trigger - emit current batch
-					return FromSlice(batch), nil
+					return FromSliceAny(batch), nil
 				}
 			}
 		}
@@ -1061,11 +1049,11 @@ func (acc *groupAccumulator) update(record Record) {
 }
 
 func emitGroupSummary(groupStats map[string]*groupAccumulator, totalProcessed int) Record {
-	summary := R(
-		"total_processed", totalProcessed,
-		"active_groups", len(groupStats),
-		"timestamp", time.Now().Unix(),
-	)
+	summary := NewRecord().
+		Int("total_processed", int64(totalProcessed)).
+		Int("active_groups", int64(len(groupStats))).
+		Int("timestamp", time.Now().Unix()).
+		Build()
 	
 	// Add details about largest group
 	var largestGroup *groupAccumulator
@@ -1078,8 +1066,8 @@ func emitGroupSummary(groupStats map[string]*groupAccumulator, totalProcessed in
 	}
 	
 	if largestGroup != nil {
-		summary.Set("largest_group_key", largestKey)
-		summary.Set("largest_group_count", largestGroup.count)
+		summary["largest_group_key"] = largestKey
+		summary["largest_group_count"] = largestGroup.count
 	}
 	
 	return summary

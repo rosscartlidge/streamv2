@@ -31,13 +31,13 @@ func demonstrateBasicRecordAggregation() {
 	
 	// Create employee data
 	employees := []stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", 95000, "years", 5, "performance", 4.5),
-		stream.R("name", "Bob", "department", "engineering", "salary", 87000, "years", 3, "performance", 4.2),
-		stream.R("name", "Charlie", "department", "sales", "salary", 92000, "years", 7, "performance", 4.8),
-		stream.R("name", "Diana", "department", "sales", "salary", 88000, "years", 4, "performance", 4.1),
-		stream.R("name", "Eve", "department", "engineering", "salary", 91000, "years", 6, "performance", 4.6),
-		stream.R("name", "Frank", "department", "sales", "salary", 85000, "years", 2, "performance", 3.9),
-		stream.R("name", "Grace", "department", "marketing", "salary", 78000, "years", 3, "performance", 4.3),
+		stream.NewRecord().String("name", "Alice").String("department", "engineering").Int("salary", 95000).Int("years", 5).Float("performance", 4.5).Build(),
+		stream.NewRecord().String("name", "Bob").String("department", "engineering").Int("salary", 87000).Int("years", 3).Float("performance", 4.2).Build(),
+		stream.NewRecord().String("name", "Charlie").String("department", "sales").Int("salary", 92000).Int("years", 7).Float("performance", 4.8).Build(),
+		stream.NewRecord().String("name", "Diana").String("department", "sales").Int("salary", 88000).Int("years", 4).Float("performance", 4.1).Build(),
+		stream.NewRecord().String("name", "Eve").String("department", "engineering").Int("salary", 91000).Int("years", 6).Float("performance", 4.6).Build(),
+		stream.NewRecord().String("name", "Frank").String("department", "sales").Int("salary", 85000).Int("years", 2).Float("performance", 3.9).Build(),
+		stream.NewRecord().String("name", "Grace").String("department", "marketing").Int("salary", 78000).Int("years", 3).Float("performance", 4.3).Build(),
 	}
 	
 	fmt.Printf("Analyzing %d employee records\n", len(employees))
@@ -102,13 +102,13 @@ func demonstrateAdvancedRecordAnalytics() {
 	
 	// Same employee data
 	employees := []stream.Record{
-		stream.R("name", "Alice", "department", "engineering", "salary", 95000, "years", 5, "performance", 4.5),
-		stream.R("name", "Bob", "department", "engineering", "salary", 87000, "years", 3, "performance", 4.2),
-		stream.R("name", "Charlie", "department", "sales", "salary", 92000, "years", 7, "performance", 4.8),
-		stream.R("name", "Diana", "department", "sales", "salary", 88000, "years", 4, "performance", 4.1),
-		stream.R("name", "Eve", "department", "engineering", "salary", 91000, "years", 6, "performance", 4.6),
-		stream.R("name", "Frank", "department", "sales", "salary", 85000, "years", 2, "performance", 3.9),
-		stream.R("name", "Grace", "department", "marketing", "salary", 78000, "years", 3, "performance", 4.3),
+		stream.NewRecord().String("name", "Alice").String("department", "engineering").Int("salary", 95000).Int("years", 5).Float("performance", 4.5).Build(),
+		stream.NewRecord().String("name", "Bob").String("department", "engineering").Int("salary", 87000).Int("years", 3).Float("performance", 4.2).Build(),
+		stream.NewRecord().String("name", "Charlie").String("department", "sales").Int("salary", 92000).Int("years", 7).Float("performance", 4.8).Build(),
+		stream.NewRecord().String("name", "Diana").String("department", "sales").Int("salary", 88000).Int("years", 4).Float("performance", 4.1).Build(),
+		stream.NewRecord().String("name", "Eve").String("department", "engineering").Int("salary", 91000).Int("years", 6).Float("performance", 4.6).Build(),
+		stream.NewRecord().String("name", "Frank").String("department", "sales").Int("salary", 85000).Int("years", 2).Float("performance", 3.9).Build(),
+		stream.NewRecord().String("name", "Grace").String("department", "marketing").Int("salary", 78000).Int("years", 3).Float("performance", 4.3).Build(),
 	}
 	
 	// Salary statistics per department
@@ -206,12 +206,12 @@ func demonstrateComplexBusinessLogic() {
 	
 	// Transaction data
 	transactions := []stream.Record{
-		stream.R("id", "T001", "customer", "Alice", "amount", 1250.50, "category", "software", "date", "2024-01-15", "status", "completed"),
-		stream.R("id", "T002", "customer", "Bob", "amount", 2100.00, "category", "hardware", "date", "2024-01-16", "status", "completed"),
-		stream.R("id", "T003", "customer", "Alice", "amount", 850.25, "category", "software", "date", "2024-01-17", "status", "pending"),
-		stream.R("id", "T004", "customer", "Charlie", "amount", 3200.75, "category", "consulting", "date", "2024-01-18", "status", "completed"),
-		stream.R("id", "T005", "customer", "Bob", "amount", 1800.00, "category", "hardware", "date", "2024-01-19", "status", "failed"),
-		stream.R("id", "T006", "customer", "Diana", "amount", 950.00, "category", "software", "date", "2024-01-20", "status", "completed"),
+		stream.NewRecord().String("id", "T001").String("customer", "Alice").Float("amount", 1250.50).String("category", "software").String("date", "2024-01-15").String("status", "completed").Build(),
+		stream.NewRecord().String("id", "T002").String("customer", "Bob").Float("amount", 2100.00).String("category", "hardware").String("date", "2024-01-16").String("status", "completed").Build(),
+		stream.NewRecord().String("id", "T003").String("customer", "Alice").Float("amount", 850.25).String("category", "software").String("date", "2024-01-17").String("status", "pending").Build(),
+		stream.NewRecord().String("id", "T004").String("customer", "Charlie").Float("amount", 3200.75).String("category", "consulting").String("date", "2024-01-18").String("status", "completed").Build(),
+		stream.NewRecord().String("id", "T005").String("customer", "Bob").Float("amount", 1800.00).String("category", "hardware").String("date", "2024-01-19").String("status", "failed").Build(),
+		stream.NewRecord().String("id", "T006").String("customer", "Diana").Float("amount", 950.00).String("category", "software").String("date", "2024-01-20").String("status", "completed").Build(),
 	}
 	
 	fmt.Printf("Analyzing %d transaction records\n", len(transactions))

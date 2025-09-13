@@ -18,12 +18,12 @@ func main() {
 	
 	// Create initial sales data
 	initialSales := []stream.Record{
-		stream.R("id", 1, "amount", 150.0, "region", "US", "product", "laptop"),
-		stream.R("id", 2, "amount", 200.0, "region", "EU", "product", "mouse"),
-		stream.R("id", 3, "amount", 175.0, "region", "US", "product", "keyboard"),
-		stream.R("id", 4, "amount", 300.0, "region", "ASIA", "product", "laptop"),
-		stream.R("id", 5, "amount", 125.0, "region", "EU", "product", "mouse"),
-		stream.R("id", 6, "amount", 250.0, "region", "ASIA", "product", "keyboard"),
+		stream.NewRecord().Int("id", 1).Float("amount", 150.0).String("region", "US").String("product", "laptop").Build(),
+		stream.NewRecord().Int("id", 2).Float("amount", 200.0).String("region", "EU").String("product", "mouse").Build(),
+		stream.NewRecord().Int("id", 3).Float("amount", 175.0).String("region", "US").String("product", "keyboard").Build(),
+		stream.NewRecord().Int("id", 4).Float("amount", 300.0).String("region", "ASIA").String("product", "laptop").Build(),
+		stream.NewRecord().Int("id", 5).Float("amount", 125.0).String("region", "EU").String("product", "mouse").Build(),
+		stream.NewRecord().Int("id", 6).Float("amount", 250.0).String("region", "ASIA").String("product", "keyboard").Build(),
 	}
 	
 	// Write to CSV
@@ -101,14 +101,14 @@ func main() {
 		products := []string{"laptop", "mouse", "keyboard", "monitor"}
 		regions := []string{"US", "EU", "ASIA"}
 		
-		return stream.R(
-			"order_id", counter,
-			"timestamp", time.Now().Unix(),
-			"product", products[rand.Intn(len(products))],
-			"region", regions[rand.Intn(len(regions))],
-			"amount", rand.Intn(400) + 100, // $100-$500
-			"customer_id", 1000 + rand.Intn(100),
-		), nil
+		return stream.NewRecord().
+			Int("order_id", counter).
+			Int("timestamp", time.Now().Unix()).
+			String("product", products[rand.Intn(len(products))]).
+			String("region", regions[rand.Intn(len(regions))]).
+			Int("amount", rand.Intn(400) + 100). // $100-$500
+			Int("customer_id", 1000 + rand.Intn(100)).
+			Build(), nil
 	}
 	
 	// Set up streaming CSV output
@@ -209,17 +209,17 @@ func main() {
 			priority = "low"
 		}
 		
-		return stream.R(
-			"order_id", stream.GetOr(order, "order_id", 0),
-			"product", product,
-			"region", region,
-			"amount", amount,
-			"tax", tax,
-			"shipping", shipping,
-			"total", total,
-			"priority", priority,
-			"processed_at", time.Now().Format("2006-01-02 15:04:05"),
-		)
+		return stream.NewRecord().
+			Int("order_id", stream.GetOr(order, "order_id", 0)).
+			String("product", product).
+			String("region", region).
+			Int("amount", amount).
+			Float("tax", tax).
+			Float("shipping", shipping).
+			Float("total", total).
+			String("priority", priority).
+			String("processed_at", time.Now().Format("2006-01-02 15:04:05")).
+			Build()
 	})(streamingOrdersStream)
 	
 	// Write processed orders to new CSV
@@ -307,17 +307,17 @@ func main() {
 			}
 		}
 		
-		analyticsResult := stream.R(
-			"window_id", windowNum2,
-			"order_count", len(windowRecords),
-			"total_amount", totalAmount,
-			"total_tax", totalTax,
-			"total_shipping", totalShipping,
-			"avg_order_value", totalAmount/float64(len(windowRecords)),
-			"dominant_region", dominantRegion,
-			"dominant_priority", dominantPriority,
-			"analysis_timestamp", time.Now().Unix(),
-		)
+		analyticsResult := stream.NewRecord().
+			Int("window_id", windowNum2).
+			Int("order_count", len(windowRecords)).
+			Float("total_amount", totalAmount).
+			Float("total_tax", totalTax).
+			Float("total_shipping", totalShipping).
+			Float("avg_order_value", totalAmount/float64(len(windowRecords))).
+			String("dominant_region", dominantRegion).
+			String("dominant_priority", dominantPriority).
+			Int("analysis_timestamp", time.Now().Unix()).
+			Build()
 		
 		analyticsResults = append(analyticsResults, analyticsResult)
 		
@@ -373,12 +373,12 @@ func main() {
 				trend = "stable"
 			}
 			
-			dashboardRecord := stream.R(
-				"timestamp", time.Now().Unix(),
-				"metric", metric,
-				"value", value,
-				"trend", trend,
-			)
+			dashboardRecord := stream.NewRecord().
+				Int("timestamp", time.Now().Unix()).
+				String("metric", metric).
+				Float("value", value).
+				String("trend", trend).
+				Build()
 			
 			err = dashboardWriter.WriteRecord(dashboardRecord)
 			if err != nil {

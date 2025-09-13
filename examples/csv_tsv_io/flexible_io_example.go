@@ -39,9 +39,9 @@ Charlie,35,85000.25,true`
 	fmt.Println("-------------------------------")
 	
 	salesData := []stream.Record{
-		stream.R("id", 1, "amount", 150.75, "customer", "Alice"),
-		stream.R("id", 2, "amount", 200.50, "customer", "Bob"),
-		stream.R("id", 3, "amount", 175.25, "customer", "Charlie"),
+		stream.NewRecord().Int("id", 1).Float("amount", 150.75).String("customer", "Alice").Build(),
+		stream.NewRecord().Int("id", 2).Float("amount", 200.50).String("customer", "Bob").Build(),
+		stream.NewRecord().Int("id", 3).Float("amount", 175.25).String("customer", "Charlie").Build(),
 	}
 	
 	// Write CSV to memory buffer
@@ -70,13 +70,13 @@ Charlie,35,85000.25,true`
 		tax := amount * 0.1
 		total := amount + tax
 		
-		return stream.R(
-			"customer", customer,
-			"original_amount", amount,
-			"tax", tax,
-			"total", total,
-			"processed_at", time.Now().Format("15:04:05"),
-		)
+		return stream.NewRecord().
+			String("customer", customer).
+			Float("original_amount", amount).
+			Float("tax", tax).
+			Float("total", total).
+			String("processed_at", time.Now().Format("15:04:05")).
+			Build()
 	})(readStream)
 	
 	// Write processed results to new buffer
@@ -95,9 +95,9 @@ Charlie,35,85000.25,true`
 	fmt.Println("------------------------")
 	
 	inventoryData := []stream.Record{
-		stream.R("sku", "LAP001", "name", "Gaming Laptop", "price", 1299.99),
-		stream.R("sku", "MOU001", "name", "Wireless Mouse", "price", 29.99),
-		stream.R("sku", "KEY001", "name", "Mechanical Keyboard", "price", 89.99),
+		stream.NewRecord().String("sku", "LAP001").String("name", "Gaming Laptop").Float("price", 1299.99).Build(),
+		stream.NewRecord().String("sku", "MOU001").String("name", "Wireless Mouse").Float("price", 29.99).Build(),
+		stream.NewRecord().String("sku", "KEY001").String("name", "Mechanical Keyboard").Float("price", 89.99).Build(),
 	}
 	
 	fmt.Println("Writing TSV directly to stdout:")
@@ -112,11 +112,11 @@ Charlie,35,85000.25,true`
 	
 	// Stage 1: Create sales data
 	salesStream := stream.FromSlice([]stream.Record{
-		stream.R("region", "US", "product", "laptop", "amount", 1200),
-		stream.R("region", "EU", "product", "mouse", "amount", 25),
-		stream.R("region", "ASIA", "product", "keyboard", "amount", 75),
-		stream.R("region", "US", "product", "monitor", "amount", 300),
-		stream.R("region", "EU", "product", "laptop", "amount", 1100),
+		stream.NewRecord().String("region", "US").String("product", "laptop").Int("amount", 1200).Build(),
+		stream.NewRecord().String("region", "EU").String("product", "mouse").Int("amount", 25).Build(),
+		stream.NewRecord().String("region", "ASIA").String("product", "keyboard").Int("amount", 75).Build(),
+		stream.NewRecord().String("region", "US").String("product", "monitor").Int("amount", 300).Build(),
+		stream.NewRecord().String("region", "EU").String("product", "laptop").Int("amount", 1100).Build(),
 	})
 	
 	// Stage 1: CSV buffer 1
@@ -145,13 +145,13 @@ Charlie,35,85000.25,true`
 		
 		finalPrice := float64(amount) * markup
 		
-		return stream.R(
-			"region", region,
-			"product", product, 
-			"base_amount", amount,
-			"markup", markup,
-			"final_price", finalPrice,
-		)
+		return stream.NewRecord().
+			String("region", region).
+			String("product", product).
+			Int("base_amount", amount).
+			Float("markup", markup).
+			Float("final_price", finalPrice).
+			Build()
 	})(stage1Stream)
 	
 	// Stage 2: CSV buffer 2  
@@ -197,13 +197,13 @@ Charlie,35,85000.25,true`
 		action := stream.GetOr(record, "action", "")
 		timestamp := stream.GetOr(record, "timestamp", "")
 		
-		return stream.R(
-			"user_id", userID,
-			"action", action,
-			"original_timestamp", timestamp,
-			"processed_at", time.Now().Unix(),
-			"session_id", fmt.Sprintf("sess_%s_%d", userID, time.Now().Unix()%1000),
-		)
+		return stream.NewRecord().
+			String("user_id", userID).
+			String("action", action).
+			String("original_timestamp", timestamp).
+			Int("processed_at", time.Now().Unix()).
+			String("session_id", fmt.Sprintf("sess_%s_%d", userID, time.Now().Unix()%1000)).
+			Build()
 	})(httpStream)
 	
 	// "Send" processed CSV back as HTTP response (to stdout)

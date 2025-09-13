@@ -80,10 +80,10 @@ sum, _ := stream.Sum(
 ## 📊 **Record Processing Made Easy**
 
 ```go
-// Create records with native Go types
-users := stream.FromRecords([]stream.Record{
-    stream.R("id", 1, "name", "Alice", "age", 25, "score", 95.5),
-    stream.R("id", 2, "name", "Bob", "age", 30, "score", 87.2),
+// Create records with type-safe constructors
+users, _ := stream.FromRecords([]stream.Record{
+    stream.NewRecord().Int("id", 1).String("name", "Alice").Int("age", 25).Float("score", 95.5).Build(),
+    stream.NewRecord().Int("id", 2).String("name", "Bob").Int("age", 30).Float("score", 87.2).Build(),
 })
 
 // Process with type safety and smart conversion
@@ -240,7 +240,11 @@ stream.GroupBy([]string{"region"},
 
 ### **Smart Type Conversion**
 ```go
-record := stream.R("age", "25", "score", "95.5", "active", 1)
+record := stream.NewRecord().
+    String("age", "25").
+    String("score", "95.5").
+    Int("active", 1).
+    Build()
 
 age := stream.Get[int64](record, "age")        // "25" → 25
 score := stream.Get[float64](record, "score")  // "95.5" → 95.5  

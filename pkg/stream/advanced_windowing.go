@@ -162,7 +162,7 @@ func SessionWindow[T any](timeout time.Duration, activityDetector ActivityDetect
 							if now.Sub(session.LastActivity) > timeout {
 								// Session expired - emit window
 								if len(session.Elements) > 0 {
-									windowCh <- FromSlice(session.Elements)
+									windowCh <- FromSliceAny(session.Elements)
 								}
 								delete(sessions, id)
 							}
@@ -180,7 +180,7 @@ func SessionWindow[T any](timeout time.Duration, activityDetector ActivityDetect
 					mu.Lock()
 					for _, session := range sessions {
 						if len(session.Elements) > 0 {
-							windowCh <- FromSlice(session.Elements)
+							windowCh <- FromSliceAny(session.Elements)
 						}
 					}
 					mu.Unlock()
@@ -358,7 +358,7 @@ func (wb *WindowBuilder[T]) createAdvancedWindow(input Stream[T]) Stream[Stream[
 				if err != nil {
 					// End of stream - emit final window if it has elements
 					if len(window.Elements) > 0 {
-						windowCh <- FromSlice(window.Elements)
+						windowCh <- FromSliceAny(window.Elements)
 					}
 					return
 				}
@@ -391,7 +391,7 @@ func (wb *WindowBuilder[T]) createAdvancedWindow(input Stream[T]) Stream[Stream[
 				
 				// Fire window if any trigger activated
 				if shouldFire {
-					windowCh <- FromSlice(window.Elements)
+					windowCh <- FromSliceAny(window.Elements)
 					
 					// Reset window for next batch
 					window = &WindowState[T]{

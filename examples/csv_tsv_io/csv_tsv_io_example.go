@@ -94,9 +94,9 @@ Chair	Furniture	199.99	true`
 	
 	// Create sample sales data
 	salesData := []stream.Record{
-		stream.R("id", 1, "amount", 150.75, "date", time.Now(), "customer", "Alice"),
-		stream.R("id", 2, "amount", 200.50, "date", time.Now().Add(-24*time.Hour), "customer", "Bob"),
-		stream.R("id", 3, "amount", 175.25, "date", time.Now().Add(-48*time.Hour), "customer", "Charlie"),
+		stream.NewRecord().Int("id", 1).Float("amount", 150.75).Set("date", time.Now()).String("customer", "Alice").Build(),
+		stream.NewRecord().Int("id", 2).Float("amount", 200.50).Set("date", time.Now().Add(-24*time.Hour)).String("customer", "Bob").Build(),
+		stream.NewRecord().Int("id", 3).Float("amount", 175.25).Set("date", time.Now().Add(-48*time.Hour)).String("customer", "Charlie").Build(),
 	}
 	
 	// Write to CSV file
@@ -132,9 +132,9 @@ Chair	Furniture	199.99	true`
 	
 	// Create inventory data
 	inventoryData := []stream.Record{
-		stream.R("sku", "LAP001", "name", "Gaming Laptop", "quantity", 15, "price", 1299.99),
-		stream.R("sku", "MOU001", "name", "Wireless Mouse", "quantity", 50, "price", 29.99),
-		stream.R("sku", "KEY001", "name", "Mechanical Keyboard", "quantity", 25, "price", 89.99),
+		stream.NewRecord().String("sku", "LAP001").String("name", "Gaming Laptop").Int("quantity", 15).Float("price", 1299.99).Build(),
+		stream.NewRecord().String("sku", "MOU001").String("name", "Wireless Mouse").Int("quantity", 50).Float("price", 29.99).Build(),
+		stream.NewRecord().String("sku", "KEY001").String("name", "Mechanical Keyboard").Int("quantity", 25).Float("price", 89.99).Build(),
 	}
 	
 	tsvOutputFile := "/tmp/inventory_output.tsv"

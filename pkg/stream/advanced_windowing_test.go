@@ -292,7 +292,7 @@ func TestAdvancedWindowingScenarios(t *testing.T) {
 		
 		sessions, err := Collect(
 			SessionWindow(sessionTimeout, activityDetector)(
-				FromSlice(events)))
+				FromSliceAny(events)))
 		
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
@@ -329,7 +329,7 @@ func TestAdvancedWindowingScenarios(t *testing.T) {
 				TriggerOnCount(10).
 				TriggerOnTime(50 * time.Millisecond).
 				Apply()(
-				FromSlice(metrics)))
+				FromSliceAny(metrics)))
 		
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)

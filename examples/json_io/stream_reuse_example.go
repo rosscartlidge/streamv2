@@ -14,13 +14,13 @@ func main() {
 	fmt.Println("\n❌ Problem: Stream exhaustion")
 	fmt.Println("----------------------------")
 	
-	record := stream.R(
-		"order_id", 1001,
-		"items", stream.FromSlice([]any{
-			stream.R("product", "laptop", "price", 1299.99),
-			stream.R("product", "mouse", "price", 29.99),
-		}),
-	)
+	record := stream.NewRecord().
+		Int("order_id", 1001).
+		Set("items", stream.FromSliceAny([]any{
+			stream.NewRecord().String("product", "laptop").Float("price", 1299.99).Build(),
+			stream.NewRecord().String("product", "mouse").Float("price", 29.99).Build(),
+		})).
+		Build()
 	
 	// First serialization - works fine
 	var buffer1 bytes.Buffer
@@ -39,17 +39,17 @@ func main() {
 	fmt.Println("\n✅ Solution 1: Use Tee for multiple outputs")
 	fmt.Println("------------------------------------------")
 	
-	originalItems := stream.FromSlice([]any{
-		stream.R("product", "keyboard", "price", 89.99),
-		stream.R("product", "monitor", "price", 299.99),
+	originalItems := stream.FromSliceAny([]any{
+		stream.NewRecord().String("product", "keyboard").Float("price", 89.99).Build(),
+		stream.NewRecord().String("product", "monitor").Float("price", 299.99).Build(),
 	})
 	
 	// Split the stream using Tee
 	teedStreams := stream.Tee(originalItems, 2)
 	
 	// Create records with different stream copies
-	record1 := stream.R("order_id", 2001, "items", teedStreams[0])
-	record2 := stream.R("order_id", 2001, "items", teedStreams[1])
+	record1 := stream.NewRecord().Int("order_id", 2001).Set("items", teedStreams[0]).Build()
+	record2 := stream.NewRecord().Int("order_id", 2001).Set("items", teedStreams[1]).Build()
 	
 	// Now we can serialize each independently
 	var teeBuffer1 bytes.Buffer
@@ -69,13 +69,13 @@ func main() {
 	
 	// Collect stream to slice first
 	itemsSlice := []any{
-		stream.R("product", "tablet", "price", 599.99),
-		stream.R("product", "case", "price", 19.99),
+		stream.NewRecord().String("product", "tablet").Float("price", 599.99).Build(),
+		stream.NewRecord().String("product", "case").Float("price", 19.99).Build(),
 	}
 	
 	// Create multiple records with fresh streams from the same slice
-	reusableRecord1 := stream.R("order_id", 3001, "items", stream.FromSlice(itemsSlice))
-	reusableRecord2 := stream.R("order_id", 3001, "items", stream.FromSlice(itemsSlice))
+	reusableRecord1 := stream.NewRecord().Int("order_id", 3001).Set("items", stream.FromSliceAny(itemsSlice)).Build()
+	reusableRecord2 := stream.NewRecord().Int("order_id", 3001).Set("items", stream.FromSliceAny(itemsSlice)).Build()
 	
 	var sliceBuffer1 bytes.Buffer
 	stream.StreamToJSON(stream.FromSlice([]stream.Record{reusableRecord1}), &sliceBuffer1)

@@ -74,23 +74,23 @@ func demonstrateRecordProcessing() {
 	fmt.Println("\n📋 Record Processing")
 	fmt.Println("--------------------")
 
-	// Create records with native Go types
-	users := stream.FromRecords([]stream.Record{
-		stream.R("id", 1, "name", "Alice", "age", 25, "score", 95.5, "active", true),
-		stream.R("id", 2, "name", "Bob", "age", 30, "score", 87.2, "active", false),
-		stream.R("id", 3, "name", "Charlie", "age", 35, "score", 92.1, "active", true),
-		stream.R("id", 4, "name", "Diana", "age", 28, "score", 88.7, "active", true),
+	// Create records with type-safe constructors
+	users, _ := stream.FromRecords([]stream.Record{
+		stream.NewRecord().Int("id", 1).String("name", "Alice").Int("age", 25).Float("score", 95.5).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 2).String("name", "Bob").Int("age", 30).Float("score", 87.2).Bool("active", false).Build(),
+		stream.NewRecord().Int("id", 3).String("name", "Charlie").Int("age", 35).Float("score", 92.1).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 4).String("name", "Diana").Int("age", 28).Float("score", 88.7).Bool("active", true).Build(),
 	})
 
 	fmt.Println("Original users:")
 	printRecords(users)
 
 	// Reset stream for processing
-	users = stream.FromRecords([]stream.Record{
-		stream.R("id", 1, "name", "Alice", "age", 25, "score", 95.5, "active", true),
-		stream.R("id", 2, "name", "Bob", "age", 30, "score", 87.2, "active", false),
-		stream.R("id", 3, "name", "Charlie", "age", 35, "score", 92.1, "active", true),
-		stream.R("id", 4, "name", "Diana", "age", 28, "score", 88.7, "active", true),
+	users, _ = stream.FromRecords([]stream.Record{
+		stream.NewRecord().Int("id", 1).String("name", "Alice").Int("age", 25).Float("score", 95.5).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 2).String("name", "Bob").Int("age", 30).Float("score", 87.2).Bool("active", false).Build(),
+		stream.NewRecord().Int("id", 3).String("name", "Charlie").Int("age", 35).Float("score", 92.1).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 4).String("name", "Diana").Int("age", 28).Float("score", 88.7).Bool("active", true).Build(),
 	})
 
 	// Beautiful record processing with type safety
@@ -103,7 +103,13 @@ func demonstrateRecordProcessing() {
 		stream.Update(func(r stream.Record) stream.Record {
 			score := stream.GetOr(r, "score", 0.0)
 			grade := getGrade(score)
-			return r.Set("grade", grade).Set("bonus", score*0.1)
+			result := make(stream.Record)
+			for k, v := range r {
+				result[k] = v
+			}
+			result["grade"] = grade
+			result["bonus"] = score * 0.1
+			return result
 		}),
 		// Select specific fields
 		stream.Select("name", "score", "grade", "bonus"),
@@ -113,11 +119,11 @@ func demonstrateRecordProcessing() {
 	printRecords(processed)
 
 	// Extract typed data for analysis
-	users = stream.FromRecords([]stream.Record{
-		stream.R("id", 1, "name", "Alice", "age", 25, "score", 95.5, "active", true),
-		stream.R("id", 2, "name", "Bob", "age", 30, "score", 87.2, "active", false),
-		stream.R("id", 3, "name", "Charlie", "age", 35, "score", 92.1, "active", true),
-		stream.R("id", 4, "name", "Diana", "age", 28, "score", 88.7, "active", true),
+	users, _ = stream.FromRecords([]stream.Record{
+		stream.NewRecord().Int("id", 1).String("name", "Alice").Int("age", 25).Float("score", 95.5).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 2).String("name", "Bob").Int("age", 30).Float("score", 87.2).Bool("active", false).Build(),
+		stream.NewRecord().Int("id", 3).String("name", "Charlie").Int("age", 35).Float("score", 92.1).Bool("active", true).Build(),
+		stream.NewRecord().Int("id", 4).String("name", "Diana").Int("age", 28).Float("score", 88.7).Bool("active", true).Build(),
 	})
 
 	scores := stream.ExtractField[float64]("score")(users)
@@ -137,12 +143,12 @@ func demonstrateTypeConversion() {
 	fmt.Println("-----------------------------")
 
 	// Create a record with mixed types
-	testRecord := stream.R(
-		"string_number", "42",
-		"int_bool", 1,
-		"float_string", 3.14159,
-		"bool_string", true,
-	)
+	testRecord := stream.NewRecord().
+		String("string_number", "42").
+		Int("int_bool", 1).
+		Float("float_string", 3.14159).
+		Bool("bool_string", true).
+		Build()
 
 	fmt.Println("Original record:", testRecord)
 
@@ -153,11 +159,11 @@ func demonstrateTypeConversion() {
 	fmt.Printf("Bool true as string: %s\n", stream.GetOr(testRecord, "bool_string", ""))
 
 	// Show type conversion in streams
-	mixedData := stream.FromRecords([]stream.Record{
-		stream.R("value", "100"),
-		stream.R("value", 200),
-		stream.R("value", 300.5),
-		stream.R("value", "400"),
+	mixedData, _ := stream.FromRecords([]stream.Record{
+		stream.Field("value", "100"),
+		stream.Field("value", int64(200)),
+		stream.Field("value", 300.5),
+		stream.Field("value", "400"),
 	})
 
 	// Extract as numbers - automatic conversion happens

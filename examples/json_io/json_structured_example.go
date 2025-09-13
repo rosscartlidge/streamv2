@@ -110,25 +110,25 @@ func main() {
 	
 	// Create sample e-commerce data with nested structures
 	salesData := []stream.Record{
-		stream.R(
-			"order_id", 1001,
-			"customer", stream.R("name", "Alice", "email", "alice@example.com"),
-			"items", stream.FromSlice([]any{
-				stream.R("product", "laptop", "quantity", 1, "price", 1299.99),
-				stream.R("product", "mouse", "quantity", 2, "price", 29.99),
-			}),
-			"total", 1359.97,
-			"timestamp", time.Now(),
-		),
-		stream.R(
-			"order_id", 1002, 
-			"customer", stream.R("name", "Bob", "email", "bob@example.com"),
-			"items", stream.FromSlice([]any{
-				stream.R("product", "keyboard", "quantity", 1, "price", 89.99),
-			}),
-			"total", 89.99,
-			"timestamp", time.Now().Add(-time.Hour),
-		),
+		stream.NewRecord().
+			Int("order_id", 1001).
+			Set("customer", stream.NewRecord().String("name", "Alice").String("email", "alice@example.com").Build()).
+			Set("items", stream.FromSliceAny([]any{
+				stream.NewRecord().String("product", "laptop").Int("quantity", 1).Float("price", 1299.99).Build(),
+				stream.NewRecord().String("product", "mouse").Int("quantity", 2).Float("price", 29.99).Build(),
+			})).
+			Float("total", 1359.97).
+			Set("timestamp", time.Now()).
+			Build(),
+		stream.NewRecord().
+			Int("order_id", 1002).
+			Set("customer", stream.NewRecord().String("name", "Bob").String("email", "bob@example.com").Build()).
+			Set("items", stream.FromSliceAny([]any{
+				stream.NewRecord().String("product", "keyboard").Int("quantity", 1).Float("price", 89.99).Build(),
+			})).
+			Float("total", 89.99).
+			Set("timestamp", time.Now().Add(-time.Hour)).
+			Build(),
 	}
 	
 	// Write as JSON Lines to memory buffer
@@ -193,15 +193,15 @@ func main() {
 			avgItemValue = total / float64(itemCount)
 		}
 		
-		return stream.R(
-			"order_id", orderID,
-			"customer_name", customerName,
-			"customer_email", customerEmail,
-			"item_count", itemCount,
-			"total_amount", total,
-			"avg_item_value", avgItemValue,
-			"processed_at", time.Now().Format("2006-01-02 15:04:05"),
-		)
+		return stream.NewRecord().
+			Int("order_id", orderID).
+			String("customer_name", customerName).
+			String("customer_email", customerEmail).
+			Int("item_count", itemCount).
+			Float("total_amount", total).
+			Float("avg_item_value", avgItemValue).
+			String("processed_at", time.Now().Format("2006-01-02 15:04:05")).
+			Build()
 	})(readBackStream)
 	
 	// Write processed results as pretty JSON
@@ -250,12 +250,12 @@ func main() {
 	
 	// Create larger dataset for aggregation
 	orderData := []stream.Record{
-		stream.R("region", "US", "category", "electronics", "amount", 1299.99),
-		stream.R("region", "EU", "category", "electronics", "amount", 899.99),
-		stream.R("region", "US", "category", "furniture", "amount", 299.99),
-		stream.R("region", "ASIA", "category", "electronics", "amount", 1199.99),
-		stream.R("region", "EU", "category", "furniture", "amount", 399.99),
-		stream.R("region", "US", "category", "electronics", "amount", 799.99),
+		stream.NewRecord().String("region", "US").String("category", "electronics").Float("amount", 1299.99).Build(),
+		stream.NewRecord().String("region", "EU").String("category", "electronics").Float("amount", 899.99).Build(),
+		stream.NewRecord().String("region", "US").String("category", "furniture").Float("amount", 299.99).Build(),
+		stream.NewRecord().String("region", "ASIA").String("category", "electronics").Float("amount", 1199.99).Build(),
+		stream.NewRecord().String("region", "EU").String("category", "furniture").Float("amount", 399.99).Build(),
+		stream.NewRecord().String("region", "US").String("category", "electronics").Float("amount", 799.99).Build(),
 	}
 	
 	// Convert to JSON, then back to stream, then aggregate

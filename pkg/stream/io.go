@@ -512,7 +512,7 @@ func convertJSONValue(value any) any {
 		return v
 	case []any:
 		// Convert array to Stream[any] for nested processing capability
-		return FromSlice(v)
+		return FromSliceAny(v)
 	case map[string]any:
 		// Convert nested object to nested Record
 		return convertJSONToRecord(v)
@@ -876,7 +876,7 @@ func convertProtobufValue(fd protoreflect.FieldDescriptor, v protoreflect.Value)
 		for i := 0; i < list.Len(); i++ {
 			items[i] = convertProtobufScalarValue(fd, list.Get(i))
 		}
-		return FromSlice(items)
+		return FromSliceAny(items)
 	}
 	
 	if fd.IsMap() {

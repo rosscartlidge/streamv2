@@ -43,10 +43,10 @@ func main() {
 	// StreamV2's Record advantage
 	fmt.Println("StreamV2 Record system (UNIQUE ADVANTAGE):")
 	users := []stream.Record{
-		stream.R("id", 1, "name", "Alice", "dept", "Engineering", "salary", 100000),
-		stream.R("id", 2, "name", "Bob", "dept", "Engineering", "salary", 90000),  
-		stream.R("id", 3, "name", "Charlie", "dept", "Sales", "salary", 80000),
-		stream.R("id", 4, "name", "Diana", "dept", "Sales", "salary", 85000),
+		stream.NewRecord().Int("id", 1).String("name", "Alice").String("dept", "Engineering").Int("salary", 100000).Build(),
+		stream.NewRecord().Int("id", 2).String("name", "Bob").String("dept", "Engineering").Int("salary", 90000).Build(),
+		stream.NewRecord().Int("id", 3).String("name", "Charlie").String("dept", "Sales").Int("salary", 80000).Build(),
+		stream.NewRecord().Int("id", 4).String("name", "Diana").String("dept", "Sales").Int("salary", 85000).Build(),
 	}
 	
 	start = time.Now()

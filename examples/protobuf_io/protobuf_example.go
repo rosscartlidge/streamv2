@@ -33,22 +33,22 @@ func main() {
 	
 	// Create sample user data using StreamV2 Records
 	userData := []stream.Record{
-		stream.R(
-			"id", int64(1001),
-			"name", "Alice Johnson", 
-			"email", "alice@example.com",
-			"active", true,
-			"tags", stream.FromSlice([]any{"developer", "golang", "streaming"}),
-			"metadata", stream.R("department", "engineering", "level", "senior"),
-		),
-		stream.R(
-			"id", int64(1002),
-			"name", "Bob Smith",
-			"email", "bob@example.com", 
-			"active", false,
-			"tags", stream.FromSlice([]any{"analyst", "data"}),
-			"metadata", stream.R("department", "analytics", "level", "junior"),
-		),
+		stream.NewRecord().
+			Int("id", 1001).
+			String("name", "Alice Johnson").
+			String("email", "alice@example.com").
+			Bool("active", true).
+			Set("tags", stream.FromSliceAny([]any{"developer", "golang", "streaming"})).
+			Set("metadata", stream.NewRecord().String("department", "engineering").String("level", "senior").Build()).
+			Build(),
+		stream.NewRecord().
+			Int("id", 1002).
+			String("name", "Bob Smith").
+			String("email", "bob@example.com").
+			Bool("active", false).
+			Set("tags", stream.FromSliceAny([]any{"analyst", "data"})).
+			Set("metadata", stream.NewRecord().String("department", "analytics").String("level", "junior").Build()).
+			Build(),
 	}
 	
 	fmt.Printf("Created %d user records\n", len(userData))
@@ -132,16 +132,16 @@ func main() {
 	departments := []string{"engineering", "analytics", "marketing", "sales"}
 	
 	for i := 0; i < 10; i++ {
-		largeDataset[i] = stream.R(
-			"id", int64(2000+i),
-			"name", fmt.Sprintf("User%d", i),
-			"email", fmt.Sprintf("user%d@example.com", i),
-			"active", i%2 == 0,
-			"metadata", stream.R(
-				"department", departments[i%len(departments)],
-				"salary", float64(50000 + i*5000),
-			),
-		)
+		largeDataset[i] = stream.NewRecord().
+			Int("id", int64(2000+i)).
+			String("name", fmt.Sprintf("User%d", i)).
+			String("email", fmt.Sprintf("user%d@example.com", i)).
+			Bool("active", i%2 == 0).
+			Set("metadata", stream.NewRecord().
+				String("department", departments[i%len(departments)]).
+				Float("salary", float64(50000 + i*5000)).
+				Build()).
+			Build()
 	}
 	
 	// Serialize to protobuf, then read back and process
@@ -164,13 +164,13 @@ func main() {
 			salary = stream.GetOr(metadata, "salary", 0.0)
 		}
 		
-		return stream.R(
-			"id", id,
-			"name", name,
-			"department", department,
-			"salary", salary,
-			"active", active,
-		)
+		return stream.NewRecord().
+			Int("id", id).
+			String("name", name).
+			String("department", department).
+			Float("salary", salary).
+			Bool("active", active).
+			Build()
 	})(reloadedStream)
 	
 	// Group by department
