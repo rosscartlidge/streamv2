@@ -66,9 +66,9 @@ func TestNoGoroutineLeaks(t *testing.T) {
 		
 		// Create split stream
 		records := []Record{
-			R("key", "A", "value", 1),
-			R("key", "B", "value", 2),
-			R("key", "A", "value", 3),
+			NewRecord().String("key", "A").Int("value", 1).Build(),
+			NewRecord().String("key", "B").Int("value", 2).Build(),
+			NewRecord().String("key", "A").Int("value", 3).Build(),
 		}
 		
 		splitStream := Split([]string{"key"})(FromSlice(records))

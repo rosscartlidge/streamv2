@@ -143,11 +143,11 @@ func TestValueInterfaceConstraints(t *testing.T) {
 	})
 }
 
-// TestBackwardCompatibility verifies old R() function still works
-func TestBackwardCompatibility(t *testing.T) {
-	t.Run("OldRFunction", func(t *testing.T) {
-		// Old R() function should still work
-		user := R("name", "Charlie", "age", int64(40), "active", true)
+// TestNewRecordBuilder verifies new record builder works correctly
+func TestNewRecordBuilder(t *testing.T) {
+	t.Run("NewRecordFunction", func(t *testing.T) {
+		// New NewRecord() builder function should work
+		user := NewRecord().String("name", "Charlie").Int("age", 40).Bool("active", true).Build()
 
 		if user["name"] != "Charlie" {
 			t.Errorf("Expected name=Charlie, got %v", user["name"])
@@ -167,7 +167,7 @@ func TestBackwardCompatibility(t *testing.T) {
 			"passed": true,
 		}
 
-		record := RecordFrom(m)
+		record := recordFrom(m)
 
 		if record["name"] != "David" {
 			t.Errorf("Expected name=David, got %v", record["name"])
@@ -194,15 +194,69 @@ func BenchmarkConstructorPerformance(b *testing.B) {
 		}
 	})
 
-	b.Run("OldRFunction", func(b *testing.B) {
+	b.Run("NewRecordBuilder", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			_ = R("name", "Alice", "age", int64(30), "salary", 75000.50, "active", true)
+			_ = NewRecord().String("name", "Alice").Int("age", 30).Float("salary", 75000.50).Bool("active", true).Build()
 		}
 	})
 
 	b.Run("TypeSafeField", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = Field("name", "Alice")
+		}
+	})
+}
+// TestStringParsing tests the string parsing functionality in convertToInt64
+func TestStringParsing(t *testing.T) {
+	t.Run("ValidStringNumbers", func(t *testing.T) {
+		record := NewRecord().
+			String("string_positive", "42").
+			String("string_negative", "-123").
+			String("string_zero", "0").
+			Build()
+		
+		// Test positive number parsing
+		parsed := GetOr(record, "string_positive", int64(999))
+		if parsed != 42 {
+			t.Errorf("Expected 42, got %d", parsed)
+		}
+		
+		// Test negative number parsing
+		parsed = GetOr(record, "string_negative", int64(999))
+		if parsed != -123 {
+			t.Errorf("Expected -123, got %d", parsed)
+		}
+		
+		// Test zero parsing
+		parsed = GetOr(record, "string_zero", int64(999))
+		if parsed != 0 {
+			t.Errorf("Expected 0, got %d", parsed)
+		}
+	})
+	
+	t.Run("InvalidStringNumbers", func(t *testing.T) {
+		record := NewRecord().
+			String("invalid_letters", "abc").
+			String("invalid_mixed", "123abc").
+			String("invalid_empty", "").
+			Build()
+		
+		// Test invalid letter string - should return default
+		parsed := GetOr(record, "invalid_letters", int64(999))
+		if parsed != 999 {
+			t.Errorf("Expected default 999, got %d", parsed)
+		}
+		
+		// Test invalid mixed string - should return default
+		parsed = GetOr(record, "invalid_mixed", int64(888))
+		if parsed != 888 {
+			t.Errorf("Expected default 888, got %d", parsed)
+		}
+		
+		// Test empty string - should return default
+		parsed = GetOr(record, "invalid_empty", int64(777))
+		if parsed != 777 {
+			t.Errorf("Expected default 777, got %d", parsed)
 		}
 	})
 }

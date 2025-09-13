@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -279,7 +280,9 @@ func convertToInt64(val any) (int64, bool) {
 	case float32:
 		return int64(v), true
 	case string:
-		// Could add string parsing here
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return parsed, true
+		}
 		return 0, false
 	default:
 		return 0, false

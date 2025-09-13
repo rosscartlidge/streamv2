@@ -112,11 +112,11 @@ func TestAutoParallelGroupBy(t *testing.T) {
 			dept := departments[i%len(departments)]
 			salary := 50000 + (i%20)*5000
 			
-			data = append(data, R(
-				"department", dept,
-				"salary", salary,
-				"experience", i%10,
-			))
+			data = append(data, NewRecord().
+				String("department", dept).
+				Int("salary", int64(salary)).
+				Int("experience", int64(i%10)).
+				Build())
 		}
 		
 		start := time.Now()
@@ -165,9 +165,9 @@ func TestAutoParallelGroupBy(t *testing.T) {
 	t.Run("SimpleGroupBySequential", func(t *testing.T) {
 		// Simple GroupBy should use sequential processing
 		data := []Record{
-			R("type", "A", "value", 1),
-			R("type", "B", "value", 2),
-			R("type", "A", "value", 3),
+			NewRecord().String("type", "A").Int("value", 1).Build(),
+			NewRecord().String("type", "B").Int("value", 2).Build(),
+			NewRecord().String("type", "A").Int("value", 3).Build(),
 		}
 		
 		results, err := Collect(
