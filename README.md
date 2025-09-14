@@ -253,9 +253,10 @@ active := stream.Get[bool](record, "active")   // 1 → true
 
 ## 📚 **Documentation**
 
-- **[API Reference](docs/API.md)** - Complete API documentation
-- **[Examples](examples/)** - Working code examples
-- **[Benchmarks](benchmarks/)** - Performance comparisons
+- **[Getting Started Codelab](STREAMV2_CODELAB.md)** - Step-by-step tutorial from basic to advanced
+- **[API Reference](docs/api.md)** - Complete API documentation for all 131+ functions
+- **[Performance Guide](docs/performance.md)** - Optimization strategies and best practices
+- **[Examples](stream_examples/)** - Working code examples and patterns
 
 ## 🎯 **Use Cases**
 
@@ -269,7 +270,9 @@ StreamV2 excels at:
 
 ## 🤝 **Contributing**
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+**⚠️ StreamV2 is currently stabilizing its API and design.** We are not yet ready for external contributions while we complete core development.
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for current status and how you can help with testing and feedback.
 
 ## 📄 **License**
 
@@ -278,9 +281,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🚀 **Getting Started**
 
 1. **Install**: `go get github.com/rosscartlidge/streamv2`
-2. **Explore**: Check out [examples/](examples/) directory
-3. **Learn**: Read the [documentation](docs/)
-4. **Build**: Start with basic operations and expand to advanced features
+2. **Learn**: Start with the [Codelab Tutorial](STREAMV2_CODELAB.md)
+3. **Reference**: Use the [API Documentation](docs/api.md) 
+4. **Optimize**: Read the [Performance Guide](docs/performance.md)
+5. **Explore**: Check out [examples](stream_examples/) for real-world patterns
 
 ---
 
