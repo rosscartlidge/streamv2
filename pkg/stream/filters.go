@@ -2,6 +2,8 @@ package stream
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 	
@@ -463,6 +465,472 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 			}
 		}
 	}
+}
+
+// DotFlatten flattens nested records using dot notation for field names.
+// Nested records become prefixed fields: {"user": {"name": "Alice"}} → {"user.name": "Alice"}
+// Stream fields are not flattened (use CrossFlatten for those).
+func DotFlatten(separator string, fields ...string) Filter[Record, Record] {
+	if separator == "" {
+		separator = "."
+	}
+	
+	return func(input Stream[Record]) Stream[Record] {
+		return func() (Record, error) {
+			record, err := input()
+			if err != nil {
+				return nil, err
+			}
+			
+			return dotFlattenRecord(record, "", separator, fields...), nil
+		}
+	}
+}
+
+// dotFlattenRecord recursively flattens a record using dot notation
+// If fields are specified, only flattens those top-level fields
+func dotFlattenRecord(record Record, prefix, separator string, fields ...string) Record {
+	result := make(Record)
+	
+	// Create a set of fields to flatten for quick lookup
+	fieldsToFlatten := make(map[string]bool)
+	if len(fields) > 0 {
+		for _, field := range fields {
+			fieldsToFlatten[field] = true
+		}
+	}
+	
+	for key, value := range record {
+		newKey := key
+		if prefix != "" {
+			newKey = prefix + separator + key
+		}
+		
+		// Check if this field should be flattened (only applies to top-level fields)
+		shouldFlatten := len(fields) == 0 || prefix != "" || fieldsToFlatten[key]
+		
+		// If the value is a nested record, flatten it recursively
+		if nestedRecord, ok := value.(Record); ok && shouldFlatten {
+			flattened := dotFlattenRecord(nestedRecord, newKey, separator)
+			for flatKey, flatValue := range flattened {
+				result[flatKey] = flatValue
+			}
+		} else {
+			// For non-record values (including streams), or fields not to be flattened, keep as-is
+			result[newKey] = value
+		}
+	}
+	
+	return result
+}
+
+// CrossFlatten creates cartesian product of stream fields within records.
+// Uses the original flatten algorithm that can handle infinite streams.
+// Example: {"id": 1, "tags": Stream["a", "b"]} → [{"id": 1, "tag": "a"}, {"id": 1, "tag": "b"}]
+func CrossFlatten(separator string, fields ...string) Filter[Record, Record] {
+	if separator == "" {
+		separator = "."
+	}
+	
+	return func(input Stream[Record]) Stream[Record] {
+		var expandedStream Stream[Record]
+		
+		return func() (Record, error) {
+			for {
+				// If we have an expanded stream, try to get next item from it
+				if expandedStream != nil {
+					record, err := expandedStream()
+					if err == nil {
+						return record, nil
+					}
+					// Expanded stream is exhausted, clear it
+					expandedStream = nil
+				}
+				
+				// Get next input record
+				record, err := input()
+				if err != nil {
+					return nil, err
+				}
+				
+				// Use field-specific flatten algorithm 
+				flattened := crossFlattenRecord(record, separator, fields...)
+				if len(flattened) > 1 {
+					// Multiple records produced, create stream from them
+					expandedStream = FromSlice(flattened)
+				} else if len(flattened) == 1 {
+					// Single record produced, return it directly
+					return flattened[0], nil
+				} else {
+					// No records produced (shouldn't happen), return original
+					return record, nil
+				}
+			}
+		}
+	}
+}
+
+// cross performs cartesian product of record slices
+func cross(columns [][]Record) []Record {
+	if len(columns) == 0 {
+		return nil
+	}
+	if len(columns) == 1 {
+		return columns[0]
+	}
+	var rs []Record
+	for _, lr := range cross(columns[1:]) {
+		for _, rr := range columns[0] {
+			r := make(Record)
+			for f := range rr {
+				r[f] = rr[f]
+			}
+			for f := range lr {
+				r[f] = lr[f]
+			}
+			rs = append(rs, r)
+		}
+	}
+	return rs
+}
+
+// flattenRecord implements the original flatten algorithm that handles both
+// dot notation for nested records and cross products for streams
+func flattenRecord(r Record, sep string) []Record {
+	var columns [][]Record
+	var fs []string
+	
+	for f := range r {
+		if s, ok := r[f].(Stream[interface{}]); ok {
+			var rs []Record
+			for {
+				if record, err := s(); err == nil {
+					if f != "" {
+						er := make(Record)
+						if recordMap, ok := record.(Record); ok {
+							// Stream contains records - add field prefix
+							for fi := range recordMap {
+								ef := []string{f}
+								if fi != "" {
+									ef = append(ef, fi)
+								}
+								er[strings.Join(ef, sep)] = recordMap[fi]
+							}
+						} else {
+							// Stream contains scalar values - use field name directly
+							er[f] = record
+						}
+						rs = append(rs, flattenRecord(er, sep)...)
+					} else {
+						if recordMap, ok := record.(Record); ok {
+							rs = append(rs, flattenRecord(recordMap, sep)...)
+						} else {
+							// Scalar in unnamed field
+							rs = append(rs, Record{"": record})
+						}
+					}
+				} else {
+					break
+				}
+			}
+			columns = append(columns, rs)
+		} else {
+			fs = append(fs, f)
+		}
+	}
+	
+	if len(columns) == 0 {
+		return []Record{r}
+	}
+	
+	crs := cross(columns)
+	if len(fs) == 0 {
+		return crs
+	}
+	
+	for _, cr := range crs {
+		for _, f := range fs {
+			cr[f] = r[f]
+		}
+	}
+	
+	return crs
+}
+
+// crossFlattenRecord expands specified stream fields using cartesian product
+// If no fields specified, expands all stream fields
+func crossFlattenRecord(r Record, sep string, fields ...string) []Record {
+	var columns [][]Record
+	var nonStreamFields []string
+	
+	// Create a set of fields to expand for quick lookup
+	fieldsToExpand := make(map[string]bool)
+	if len(fields) > 0 {
+		for _, field := range fields {
+			fieldsToExpand[field] = true
+		}
+	}
+	
+	for f := range r {
+		if s, ok := r[f].(Stream[interface{}]); ok {
+			// Check if this field should be expanded
+			shouldExpand := len(fields) == 0 || fieldsToExpand[f]
+			
+			if shouldExpand {
+				var rs []Record
+				for {
+					if record, err := s(); err == nil {
+						// Create a record with this stream value
+						newRecord := Record{f: record}
+						rs = append(rs, newRecord)
+					} else {
+						break
+					}
+				}
+				if len(rs) > 0 {
+					columns = append(columns, rs)
+				}
+			} else {
+				// Keep stream field as-is (don't expand)
+				nonStreamFields = append(nonStreamFields, f)
+			}
+		} else {
+			// Non-stream field
+			nonStreamFields = append(nonStreamFields, f)
+		}
+	}
+	
+	// If no stream fields to expand, return original record
+	if len(columns) == 0 {
+		return []Record{r}
+	}
+	
+	// Create cartesian product of expanded fields
+	crs := cross(columns)
+	
+	// Add non-stream fields to each result record
+	for _, cr := range crs {
+		for _, f := range nonStreamFields {
+			cr[f] = r[f]
+		}
+	}
+	
+	return crs
+}
+
+// JoinOption configures join behavior
+type JoinOption func(*joinConfig)
+
+// joinConfig holds join configuration
+type joinConfig struct {
+	leftPrefix  string
+	rightPrefix string
+}
+
+// WithPrefixes sets custom prefixes for field name conflicts
+// Default is "left." and "right."
+func WithPrefixes(leftPrefix, rightPrefix string) JoinOption {
+	return func(config *joinConfig) {
+		config.leftPrefix = leftPrefix
+		config.rightPrefix = rightPrefix
+	}
+}
+
+// InnerJoin performs an inner join between left stream and right stream.
+// Only records with matching keys in both streams are returned.
+// WARNING: Right stream is collected into memory - must be finite and reasonably sized.
+func InnerJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record] {
+	return createJoin(rightStream, leftKey, rightKey, innerJoinType, options...)
+}
+
+// LeftJoin performs a left join between left stream and right stream.
+// All records from left stream are returned, with matching right records when available.
+// WARNING: Right stream is collected into memory - must be finite and reasonably sized.
+func LeftJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record] {
+	return createJoin(rightStream, leftKey, rightKey, leftJoinType, options...)
+}
+
+// RightJoin performs a right join between left stream and right stream.
+// All records from right stream are returned, with matching left records when available.
+// WARNING: Right stream is collected into memory - must be finite and reasonably sized.
+func RightJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record] {
+	return createJoin(rightStream, leftKey, rightKey, rightJoinType, options...)
+}
+
+// FullJoin performs a full outer join between left stream and right stream.
+// All records from both streams are returned, with matching when available.
+// WARNING: Right stream is collected into memory - must be finite and reasonably sized.
+func FullJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record] {
+	return createJoin(rightStream, leftKey, rightKey, fullJoinType, options...)
+}
+
+type joinType int
+
+const (
+	innerJoinType joinType = iota
+	leftJoinType
+	rightJoinType
+	fullJoinType
+)
+
+// createJoin implements the hash join algorithm for all join types
+func createJoin(rightStream Stream[Record], leftKey, rightKey string, jType joinType, options ...JoinOption) Filter[Record, Record] {
+	// Apply configuration options
+	config := &joinConfig{
+		leftPrefix:  "left.",
+		rightPrefix: "right.",
+	}
+	for _, option := range options {
+		option(config)
+	}
+
+	return func(leftStream Stream[Record]) Stream[Record] {
+		// Build hash table from right stream (WARNING: collects entire right stream into memory)
+		rightMap := make(map[string][]Record)
+		rightKeysUsed := make(map[string]bool) // Track which right keys were matched (for full join)
+		
+		// Collect right stream into hash map
+		for {
+			rightRecord, err := rightStream()
+			if err != nil {
+				break // End of right stream
+			}
+			
+			// Get the join key value from right record
+			rightKeyValue := getJoinKeyValue(rightRecord, rightKey)
+			if rightKeyValue != "" {
+				rightMap[rightKeyValue] = append(rightMap[rightKeyValue], rightRecord)
+			}
+		}
+
+		// For right and full joins, we need to track unmatched right records
+		var unmatchedRightRecords []Record
+		if jType == rightJoinType || jType == fullJoinType {
+			// Prepare list of all right records for later processing
+			for key, records := range rightMap {
+				for _, record := range records {
+					unmatchedRightRecords = append(unmatchedRightRecords, record)
+				}
+				rightKeysUsed[key] = false
+			}
+		}
+
+		var pendingResults []Record
+		pendingIndex := 0
+		leftFinished := false
+
+		return func() (Record, error) {
+			// Return pending results first
+			if pendingIndex < len(pendingResults) {
+				result := pendingResults[pendingIndex]
+				pendingIndex++
+				return result, nil
+			}
+
+			// Reset pending results
+			pendingResults = nil
+			pendingIndex = 0
+
+			// Process left stream
+			if !leftFinished {
+				leftRecord, err := leftStream()
+				if err != nil {
+					leftFinished = true
+					// Handle right/full join unmatched right records
+					if jType == rightJoinType || jType == fullJoinType {
+						for key, used := range rightKeysUsed {
+							if !used {
+								for _, rightRecord := range rightMap[key] {
+									merged := mergeRecords(nil, rightRecord, config.leftPrefix, config.rightPrefix)
+									pendingResults = append(pendingResults, merged)
+								}
+							}
+						}
+						if len(pendingResults) > 0 {
+							result := pendingResults[0]
+							pendingIndex = 1
+							return result, nil
+						}
+					}
+					return nil, EOS
+				}
+
+				// Get the join key value from left record
+				leftKeyValue := getJoinKeyValue(leftRecord, leftKey)
+				
+				// Look up matching right records
+				if matchingRightRecords, exists := rightMap[leftKeyValue]; exists && leftKeyValue != "" {
+					// Mark this right key as used
+					rightKeysUsed[leftKeyValue] = true
+					
+					// Create joined records for each match
+					for _, rightRecord := range matchingRightRecords {
+						merged := mergeRecords(leftRecord, rightRecord, config.leftPrefix, config.rightPrefix)
+						pendingResults = append(pendingResults, merged)
+					}
+				} else {
+					// No match found
+					if jType == leftJoinType || jType == fullJoinType {
+						// Left/Full join: include left record with nil right
+						merged := mergeRecords(leftRecord, nil, config.leftPrefix, config.rightPrefix)
+						pendingResults = append(pendingResults, merged)
+					}
+					// Inner/Right join: skip this left record
+				}
+
+				// Return first result if any
+				if len(pendingResults) > 0 {
+					result := pendingResults[0]
+					pendingIndex = 1
+					return result, nil
+				}
+
+				// No results, continue to next left record
+				return createJoin(rightStream, leftKey, rightKey, jType, options...)(leftStream)()
+			}
+
+			return nil, EOS
+		}
+	}
+}
+
+// getJoinKeyValue extracts the join key value from a record
+func getJoinKeyValue(record Record, keyField string) string {
+	if value, exists := record[keyField]; exists {
+		return fmt.Sprintf("%v", value)
+	}
+	return ""
+}
+
+// mergeRecords combines left and right records, handling field name conflicts
+func mergeRecords(leftRecord, rightRecord Record, leftPrefix, rightPrefix string) Record {
+	result := make(Record)
+
+	// Add left record fields
+	if leftRecord != nil {
+		for key, value := range leftRecord {
+			result[key] = value
+		}
+	}
+
+	// Add right record fields, handling conflicts
+	if rightRecord != nil {
+		for key, value := range rightRecord {
+			if _, exists := result[key]; exists && leftPrefix != "" && rightPrefix != "" {
+				// Conflict: add prefixed versions
+				if leftRecord != nil {
+					result[leftPrefix+key] = result[key]
+					delete(result, key)
+				}
+				result[rightPrefix+key] = value
+			} else {
+				// No conflict or no prefixes
+				result[key] = value
+			}
+		}
+	}
+
+	return result
 }
 
 // Split splits a stream of records into substreams based on key fields.
