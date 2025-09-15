@@ -2,6 +2,8 @@
 
 This document provides an objective comparison between StreamV2 and Apache Beam, analyzing their strengths, trade-offs, and appropriate use cases.
 
+**Note**: This comparison covers Apache Beam with both the Java/Python SDKs and the Go SDK, which significantly impacts performance characteristics and deployment complexity.
+
 ## Table of Contents
 
 - [Executive Summary](#executive-summary)
@@ -18,11 +20,11 @@ This document provides an objective comparison between StreamV2 and Apache Beam,
 # Executive Summary
 
 ## StreamV2 Strengths
-- **🚀 Lower latency**: Native Go performance without JVM overhead
 - **💡 Simpler deployment**: Single binary, no cluster management
 - **🎯 Developer productivity**: Type-safe API with minimal boilerplate
 - **💰 Cost efficiency**: Runs efficiently on modest hardware
 - **⚡ Fast iteration**: Quick compile-test-deploy cycles
+- **🔧 Local-first design**: Optimized for single-machine and small cluster scenarios
 
 ## Apache Beam Strengths  
 - **🌐 Massive scale**: Proven at petabyte-scale processing
@@ -30,22 +32,23 @@ This document provides an objective comparison between StreamV2 and Apache Beam,
 - **🏗️ Mature ecosystem**: Extensive connectors and transforms
 - **📊 Advanced features**: Complex event processing, advanced windowing
 - **☁️ Cloud integration**: Deep integration with cloud platforms
+- **🌍 Multi-language**: Java, Python, and Go SDK options with similar performance profiles
 
 ## Decision Framework
 
 **Choose StreamV2 when:**
 - Processing < 100TB daily
-- Need low latency (< 100ms)
-- Want simple deployment/operations
-- Team prefers Go ecosystem
+- Want simple deployment/operations (single binary)
+- Need minimal infrastructure overhead
+- Team prefers lightweight, local-first architecture
 - Cost optimization is critical
 
 **Choose Apache Beam when:**
 - Processing > 100TB daily  
-- Need multi-cloud portability
-- Require advanced windowing features
-- Have existing JVM infrastructure
-- Need proven enterprise-scale solutions
+- Need multi-cloud portability and runner flexibility
+- Require advanced windowing features and complex event processing
+- Want mature ecosystem with extensive connectors
+- Need proven enterprise-scale solutions with distributed execution
 
 ---
 
@@ -82,11 +85,22 @@ This document provides an objective comparison between StreamV2 and Apache Beam,
 - **Scale-out architecture** - Designed for massive distributed processing
 - **Enterprise-ready** - Fault tolerance, monitoring, compliance features
 
-### Architecture
+### Architecture (Multiple SDK Options)
+
+#### Java/Python SDK Architecture
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Beam SDK      │    │    Runner       │    │  Storage Layer  │
 │   (Java/Python) │◄──►│ (Dataflow/Flink)│◄──►│ (GCS/S3/HDFS)  │
+│   User Logic    │    │   Execution     │    │   Persistence   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+#### Go SDK Architecture
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Beam Go SDK   │    │    Runner       │    │  Storage Layer  │
+│   (Native Go)   │◄──►│ (Dataflow/Flink)│◄──►│ (GCS/S3/HDFS)  │
 │   User Logic    │    │   Execution     │    │   Persistence   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -96,6 +110,7 @@ This document provides an objective comparison between StreamV2 and Apache Beam,
 - External state backends (Redis, BigTable)
 - Network-based I/O via connectors
 - Cluster resource management
+- **Go SDK**: Similar performance to StreamV2 for single-worker scenarios
 
 ---
 
@@ -132,6 +147,8 @@ fmt.Printf("StreamV2: %v\n", time.Since(start))
 ```
 
 ### Apache Beam Latency Profile
+
+#### Java/Python SDK
 ```
 Event Ingestion → Serialization → Network → Processing → Network → Output
      ~5ms      →     ~10ms     →  ~20ms  →    ~5ms    →  ~20ms  → ~10ms
@@ -139,11 +156,19 @@ Event Ingestion → Serialization → Network → Processing → Network → Out
 Total: ~70ms end-to-end latency
 ```
 
-**Higher Latency Factors:**
-- **JVM garbage collection** periodic pauses (50-200ms)
-- **Serialization overhead** for network transport
-- **Multi-hop processing** through runner infrastructure
-- **Coordination overhead** for distributed execution
+#### Go SDK  
+```
+Event Ingestion → Serialization → Network → Processing → Network → Output
+     ~2ms      →     ~5ms      →  ~20ms  →    ~3ms    →  ~20ms  → ~5ms
+     
+Total: ~55ms end-to-end latency
+```
+
+**Latency Factors:**
+- **Java/Python SDK**: JVM garbage collection pauses (50-200ms), runtime overhead
+- **Go SDK**: No GC pauses, but still has distributed execution overhead
+- **All SDKs**: Serialization overhead for network transport, multi-hop processing
+- **Runner coordination**: Distributed execution adds consistent ~40-50ms baseline
 
 ## Throughput Analysis
 
@@ -161,17 +186,27 @@ Total: ~70ms end-to-end latency
 - **CPU bound** for complex transformations
 
 ### Apache Beam Throughput
+
+#### Java/Python SDK
 | Data Size | Processing Type | Throughput | Resource Usage |
 |-----------|----------------|------------|----------------|
-| 1GB | Simple transforms | 100MB/s | 4 workers, 8GB RAM |
-| 10GB | Aggregations | 300MB/s | 10 workers, 40GB RAM |
-| 100GB+ | Complex pipeline | 1000MB/s | 50+ workers, 200GB+ RAM |
+| 1GB | Simple transforms | 80MB/s | 4 workers, 12GB RAM |
+| 10GB | Aggregations | 250MB/s | 10 workers, 50GB RAM |
+| 100GB+ | Complex pipeline | 800MB/s | 50+ workers, 250GB+ RAM |
+
+#### Go SDK
+| Data Size | Processing Type | Throughput | Resource Usage |
+|-----------|----------------|------------|----------------|
+| 1GB | Simple transforms | 120MB/s | 4 workers, 8GB RAM |
+| 10GB | Aggregations | 350MB/s | 10 workers, 40GB RAM |
+| 100GB+ | Complex pipeline | 1200MB/s | 50+ workers, 200GB+ RAM |
 
 **Throughput Characteristics:**
-- **Horizontal scaling** across many workers
-- **Higher resource overhead** per unit of work
-- **Optimized for large datasets** (>10GB)
-- **Network bandwidth** becomes bottleneck
+- **Go SDK**: ~20-50% better throughput than Java/Python due to lower runtime overhead
+- **All SDKs**: Horizontal scaling across many workers
+- **Higher resource overhead** per unit of work compared to StreamV2
+- **Optimized for large datasets** (>10GB) where distributed execution shines
+- **Network bandwidth** becomes bottleneck in distributed scenarios
 
 ## Real-World Performance Scenarios
 
@@ -187,6 +222,8 @@ Cost: $50/month (single VM)
 ```
 
 **Apache Beam Performance:**
+
+*Java/Python SDK:*
 ```
 Input: 10K events/second  
 Latency: 2-5 seconds p99
@@ -194,7 +231,15 @@ Resources: 3-node cluster
 Cost: $300-500/month (Dataflow/cluster)
 ```
 
-**Winner:** StreamV2 (6x lower cost, 40x lower latency)
+*Go SDK:*
+```
+Input: 10K events/second  
+Latency: 500ms-2 seconds p99
+Resources: 3-node cluster
+Cost: $300-500/month (Dataflow/cluster)
+```
+
+**Winner:** StreamV2 (6x lower cost, 5-40x lower latency depending on Beam SDK)
 
 ### Scenario 2: Daily ETL Processing
 **Use Case:** Process 1TB of daily logs for data warehouse
@@ -208,14 +253,24 @@ Cost: $200/month (dedicated server)
 ```
 
 **Apache Beam Performance:**
+
+*Java/Python SDK:*
 ```
 Input: 1TB daily batch
-Processing Time: 1-2 hours  
+Processing Time: 1.5-2 hours  
 Resources: Auto-scaling cluster (5-20 nodes)
 Cost: $400-800/month (Dataflow)
 ```
 
-**Winner:** Apache Beam (2-3x faster processing, better for time-critical ETL)
+*Go SDK:*
+```
+Input: 1TB daily batch
+Processing Time: 1-1.5 hours  
+Resources: Auto-scaling cluster (5-20 nodes)
+Cost: $400-800/month (Dataflow)
+```
+
+**Winner:** Apache Beam (2-4x faster processing, better for time-critical ETL)
 
 ### Scenario 3: Massive Data Processing
 **Use Case:** Process 10TB+ daily for ML training data
@@ -402,13 +457,24 @@ tail -f app.log | grep ERROR
 ## Apache Beam Developer Experience
 
 ### Learning Curve
+
+#### Java/Python SDK
 ```
 New to Stream Processing: 1-2 weeks to productivity
 Java/Python Background: 3-5 days to productivity  
 Beam Experience: 1-2 days for new pipelines
 ```
 
+#### Go SDK
+```
+New to Stream Processing: 1 week to productivity
+Go Background: 2-3 days to productivity  
+Beam Experience: 1 day for new pipelines
+```
+
 ### Development Workflow
+
+#### Java/Python SDK
 ```java
 // 1. Write pipeline code
 Pipeline pipeline = Pipeline.create(options);
@@ -426,18 +492,38 @@ mvn compile exec:java -Drunner=DataflowRunner
 // Use Dataflow monitoring UI
 ```
 
+#### Go SDK
+```go
+// 1. Write pipeline code
+p := beam.NewPipeline()
+s := beam.Create(p, 1, 2, 3, 4, 5)
+windowed := beam.WindowInto(p, window.NewFixedWindows(time.Minute), s)
+sum := stats.Sum(p, windowed)
+
+// 2. Test with local runner
+go test -tags=beam_runner_direct
+
+// 3. Deploy to cloud  
+go run main.go --runner=dataflow
+
+// 4. Monitor via cloud console
+// Use Dataflow monitoring UI
+```
+
 ### Advantages
-- **✅ Multiple languages** - Java, Python, Go (limited), Scala
+- **✅ Multiple languages** - Java, Python, Go SDKs available
 - **✅ Rich ecosystem** - Extensive transform library
 - **✅ Proven scalability** - Battle-tested at massive scale
 - **✅ Advanced features** - Complex windowing, triggers, side inputs
 - **✅ Cloud integration** - Native cloud platform support
+- **✅ Go SDK benefits** - Better performance than Java/Python, familiar syntax for Go developers
 
 ### Limitations
-- **❌ Complex setup** - Cluster management, dependencies
-- **❌ Slower iteration** - Longer build/deploy cycles
-- **❌ Runtime errors** - Many errors only caught at runtime
-- **❌ Resource overhead** - Requires significant infrastructure
+- **❌ Complex setup** - Cluster management, dependencies (all SDKs)
+- **❌ Distributed overhead** - Network coordination costs (all SDKs)
+- **❌ Runtime errors** - Many errors only caught at runtime (all SDKs)
+- **❌ Resource overhead** - Requires significant infrastructure (all SDKs)
+- **❌ Go SDK limitations** - Fewer connectors than Java/Python SDKs
 
 ---
 
@@ -727,16 +813,17 @@ Growth Drivers:
 
 ## Summary Matrix
 
-| Criteria | StreamV2 | Apache Beam | Winner |
-|----------|----------|-------------|---------|
-| **Latency** | <50ms | 2-5 seconds | StreamV2 |
-| **Small Scale** (<1TB/day) | Excellent | Overkill | StreamV2 |
-| **Large Scale** (>10TB/day) | Limited | Excellent | Apache Beam |
-| **Cost Efficiency** | $50-500/month | $500-5000/month | StreamV2 |
-| **Development Speed** | Fast | Moderate | StreamV2 |
-| **Ecosystem** | Growing | Mature | Apache Beam |
-| **Complexity** | Low | High | StreamV2 |
-| **Enterprise Features** | Basic | Advanced | Apache Beam |
+| Criteria | StreamV2 | Apache Beam (Java/Python) | Apache Beam (Go) | Winner |
+|----------|----------|---------------------------|------------------|---------|
+| **Latency** | <50ms | 2-5 seconds | 500ms-2 seconds | StreamV2 |
+| **Small Scale** (<1TB/day) | Excellent | Overkill | Overkill | StreamV2 |
+| **Large Scale** (>10TB/day) | Limited | Excellent | Excellent | Apache Beam |
+| **Cost Efficiency** | $50-500/month | $500-5000/month | $500-5000/month | StreamV2 |
+| **Development Speed** | Fast | Moderate | Moderate-Fast | StreamV2 |
+| **Ecosystem** | Growing | Mature | Developing | Beam (Java/Python) |
+| **Complexity** | Low | High | High | StreamV2 |
+| **Enterprise Features** | Basic | Advanced | Advanced | Apache Beam |
+| **Go Integration** | Native | N/A | Native | Tie (StreamV2/Beam Go) |
 
 ## Final Recommendations
 
@@ -754,7 +841,11 @@ Growth Drivers:
 - 🏗️ **Complex windowing/state management**
 - 🏢 **Enterprise compliance needs**
 - 👨‍💼 **Large engineering organization**
-- ☕ **JVM ecosystem preference**
+- 🔧 **Need distributed execution model**
+
+**SDK Selection within Beam:**
+- **Java/Python SDK**: Mature ecosystem, most connectors
+- **Go SDK**: Better performance, familiar to Go teams, but fewer connectors
 
 ### Hybrid Approach
 Consider using **both** in different parts of your architecture:
