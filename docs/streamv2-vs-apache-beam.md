@@ -434,10 +434,10 @@ Apache Beam Maintained Advantages:
 ### Timeline and Availability
 
 **Development Phases (Planned):**
-1. **Q2 2024**: Core CUDA integration for mathematical operations
-2. **Q3 2024**: Automatic CPU/GPU selection algorithms  
-3. **Q4 2024**: Network analytics GPU acceleration
-4. **Q1 2025**: Production-ready GPU executor with full API coverage
+1. **Q4 2025**: Core CUDA integration for mathematical operations
+2. **Q1 2026**: Automatic CPU/GPU selection algorithms  
+3. **Q2 2026**: Network analytics GPU acceleration
+4. **Q3 2026**: Production-ready GPU executor with full API coverage
 
 **Hardware Requirements (Planned):**
 - **Minimum**: CUDA 11.0+ compatible GPU (GTX 1060/Tesla T4)
@@ -963,7 +963,7 @@ Growth Drivers:
 
 ## Summary Matrix
 
-### Current State (2024)
+### Current State (2025)
 | Criteria | StreamV2 | Apache Beam (Java/Python) | Apache Beam (Go) | Winner |
 |----------|----------|---------------------------|------------------|---------|
 | **Latency** | <50ms | 2-5 seconds | 500ms-2 seconds | StreamV2 |
@@ -976,7 +976,7 @@ Growth Drivers:
 | **Enterprise Features** | Basic | Advanced | Advanced | Apache Beam |
 | **Go Integration** | Native | N/A | Native | Tie (StreamV2/Beam Go) |
 
-### Projected State with GPU Acceleration (2025)
+### Projected State with GPU Acceleration (2026)
 | Criteria | StreamV2 + GPU | Apache Beam (Java/Python) | Apache Beam (Go) | Winner |
 |----------|-----------------|---------------------------|------------------|---------|
 | **Latency** | <10ms | 2-5 seconds | 500ms-2 seconds | StreamV2 |
@@ -991,7 +991,7 @@ Growth Drivers:
 
 ### Choose **StreamV2** if:
 
-#### Current (2024):
+#### Current (2025):
 - 🎯 **Data volume < 100GB/day**
 - ⚡ **Latency requirements < 1 second**  
 - 💰 **Cost optimization critical**
@@ -999,7 +999,7 @@ Growth Drivers:
 - 👥 **Small to medium team**
 - 🔧 **Go ecosystem preference**
 
-#### Additional with GPU (2025+):
+#### Additional with GPU (2026+):
 - 🧮 **Mathematical/statistical workloads** - GPU acceleration provides 10-50x speedup
 - 🌐 **Network security analytics** - Real-time pattern detection and anomaly analysis
 - 💹 **Financial real-time processing** - Low-latency trading and risk analytics
@@ -1023,11 +1023,11 @@ Growth Drivers:
 ### Hybrid Approach
 Consider using **both** in different parts of your architecture:
 
-#### Current (2024):
+#### Current (2025):
 - **StreamV2 for real-time, low-latency processing** (<100GB/day)
 - **Apache Beam for batch ETL and large-scale analytics** (>1TB/day)
 
-#### Future with GPU (2025+):
+#### Future with GPU (2026+):
 - **StreamV2 for mathematical/analytics workloads** (up to 1TB/day)
 - **StreamV2 for real-time network/financial analytics** (any scale)
 - **Apache Beam for text/string processing and petabyte-scale distributed workloads**
@@ -1037,13 +1037,13 @@ This leverages the strengths of each system while minimizing their respective li
 ### Migration Timeline Considerations
 
 **If considering StreamV2 adoption:**
-- **Immediate (2024)**: Excellent for small-medium scale and low-latency requirements
-- **Wait for GPU (2025+)**: If your workloads are math-heavy and currently using expensive distributed solutions
+- **Immediate (2025)**: Excellent for small-medium scale and low-latency requirements
+- **Wait for GPU (Q4 2025 - 2026)**: If your workloads are math-heavy and currently using expensive distributed solutions
 
 **If considering Apache Beam:**
 - **Choose now**: For immediate large-scale (>1TB/day) or enterprise requirements
-- **Reevaluate in 2025**: GPU-accelerated StreamV2 may change the cost/performance equation for your use case
+- **Reevaluate in 2026**: GPU-accelerated StreamV2 may change the cost/performance equation for your use case
 
 ---
 
-*This comparison is based on current capabilities as of January 2024 and planned GPU acceleration features. Both StreamV2 and Apache Beam continue to evolve rapidly. GPU acceleration timeline is projected and subject to development priorities.*
+*This comparison is based on current capabilities as of September 2025 and planned GPU acceleration features. Both StreamV2 and Apache Beam continue to evolve rapidly. GPU acceleration timeline is projected and subject to development priorities.*
