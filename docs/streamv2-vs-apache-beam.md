@@ -294,6 +294,156 @@ Scalability: Petabyte-scale proven
 
 **Winner:** Apache Beam (only viable option at this scale)
 
+## StreamV2 GPU Acceleration (Planned)
+
+⚠️ **Note**: The following represents planned capabilities currently in development. CUDA acceleration is not yet available in production.
+
+### Planned CUDA Integration
+
+StreamV2 is developing transparent GPU acceleration that will automatically utilize CUDA-compatible hardware when available and beneficial. This will significantly enhance performance for mathematical and parallel processing workloads.
+
+#### Expected Architecture
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Go Binary     │    │   Auto Executor │    │   Local Storage │
+│                 │◄──►│   CPU/GPU       │◄──►│   Files/DBs     │
+│ StreamV2 Logic  │    │   Selection     │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Performance Projections
+
+#### Mathematical Operations (Target Improvements)
+```go
+// Complex mathematical transformations
+stream.Map(func(x float64) float64 {
+    return math.Sin(x) * math.Cos(x) * math.Sqrt(x+1)
+})(largeDataset)
+
+// Expected performance:
+// CPU-only (current): 50MB/s
+// GPU-accelerated (planned): 500-2000MB/s (10-40x improvement)
+```
+
+#### Large Dataset Processing
+| Operation Type | Current (CPU) | Planned (GPU) | Improvement |
+|----------------|---------------|---------------|-------------|
+| Mathematical transforms | 50MB/s | 500-2000MB/s | 10-40x |
+| Aggregations (sum/avg) | 100MB/s | 800-3000MB/s | 8-30x |
+| Complex analytics | 30MB/s | 400-1500MB/s | 13-50x |
+| Network analysis | 20MB/s | 300-1000MB/s | 15-50x |
+
+#### Transparent GPU Selection (Planned)
+```go
+// Same API - automatic hardware selection
+data := generateFloatData(10_000_000)
+
+// Simple operations: Stay on CPU (efficient)
+simple := stream.Map(func(x float64) float64 { return x * 2 })(data)
+
+// Complex operations: Auto-GPU acceleration
+complex := stream.Map(func(x float64) float64 {
+    return math.Sin(x) * math.Cos(x) * math.Exp(x/1000)
+})(data)
+
+// Network analytics: GPU-optimized algorithms
+networkStats := stream.NetworkAnalytics(netflowData) // GPU-accelerated
+```
+
+### Revised Performance Scenarios (with GPU)
+
+#### Scenario 2 Revisited: Daily ETL with GPU Acceleration
+**Use Case:** Process 1TB of daily logs with mathematical transformations
+
+**StreamV2 Performance (Planned GPU):**
+```
+Input: 1TB daily batch (with complex math)
+Processing Time: 1-2 hours (vs current 4-6 hours)
+Resources: 8 CPU cores, 16GB RAM, 1 GPU (RTX 4090/Tesla T4)
+Cost: $300/month (including GPU VM)
+```
+
+**Comparison Update:**
+- **StreamV2 (GPU)**: Competitive with Apache Beam for math-heavy workloads
+- **Cost advantage**: Still 30-60% lower than distributed Beam clusters
+- **Latency advantage**: Maintains <100ms latency vs Beam's distributed overhead
+
+#### Network Analytics (High-Impact Use Case)
+**Use Case:** Real-time network traffic analysis and anomaly detection
+
+**StreamV2 Performance (Planned GPU):**
+```
+Input: 1M packets/second NetFlow data
+Processing: Complex pattern detection, statistical analysis
+Latency: <10ms p99 (GPU-accelerated algorithms)
+Resources: 4 CPU cores, 8GB RAM, 1 GPU
+Cost: $200/month
+```
+
+**Apache Beam Performance:**
+```
+Input: 1M packets/second
+Latency: 500ms-2 seconds (distributed coordination overhead)
+Resources: 10+ worker cluster
+Cost: $800-1500/month
+```
+
+**Expected Winner:** StreamV2 (50x lower latency, 4-7x lower cost)
+
+### GPU Acceleration Benefits
+
+#### Workloads That Will Benefit Most
+- **Mathematical transformations** - Trigonometric, statistical functions
+- **Network analytics** - Pattern matching, anomaly detection  
+- **Image/signal processing** - When working with binary data streams
+- **Cryptographic operations** - Hashing, encoding operations
+- **Large aggregations** - Sum, average, statistical calculations
+
+#### Workloads That Stay CPU-Optimized
+- **Simple transformations** - Basic arithmetic, string operations
+- **Small datasets** - <10MB where GPU overhead exceeds benefits
+- **I/O bound operations** - File reading, network requests
+- **Control flow heavy** - Complex conditional logic
+
+### Competitive Impact Analysis
+
+#### vs Apache Beam Post-GPU
+```
+Strengths Matrix (Planned):
+
+StreamV2 GPU Advantages:
+✅ 10-50x performance for math-heavy workloads
+✅ 5-10x lower latency (no distributed coordination)
+✅ 50-70% lower costs (single machine + GPU vs cluster)
+✅ Zero configuration GPU utilization
+✅ Local execution simplicity
+
+Apache Beam Maintained Advantages:
+✅ Petabyte-scale distributed processing
+✅ Advanced windowing and state management
+✅ Multi-cloud portability
+✅ Mature ecosystem and connectors
+✅ Enterprise compliance features
+```
+
+#### Market Positioning Update (Post-GPU)
+- **StreamV2**: Becomes competitive for **data science workloads** and **real-time analytics**
+- **Sweet spot expands**: From <100GB/day to <1TB/day for GPU-suitable workloads
+- **New use cases**: Network security analytics, financial real-time processing, IoT sensor analysis
+
+### Timeline and Availability
+
+**Development Phases (Planned):**
+1. **Q2 2024**: Core CUDA integration for mathematical operations
+2. **Q3 2024**: Automatic CPU/GPU selection algorithms  
+3. **Q4 2024**: Network analytics GPU acceleration
+4. **Q1 2025**: Production-ready GPU executor with full API coverage
+
+**Hardware Requirements (Planned):**
+- **Minimum**: CUDA 11.0+ compatible GPU (GTX 1060/Tesla T4)
+- **Recommended**: RTX 4090/Tesla V100 for optimal performance
+- **Fallback**: Automatic CPU execution when GPU unavailable
+
 ---
 
 # Resource Requirements
@@ -813,6 +963,7 @@ Growth Drivers:
 
 ## Summary Matrix
 
+### Current State (2024)
 | Criteria | StreamV2 | Apache Beam (Java/Python) | Apache Beam (Go) | Winner |
 |----------|----------|---------------------------|------------------|---------|
 | **Latency** | <50ms | 2-5 seconds | 500ms-2 seconds | StreamV2 |
@@ -825,9 +976,22 @@ Growth Drivers:
 | **Enterprise Features** | Basic | Advanced | Advanced | Apache Beam |
 | **Go Integration** | Native | N/A | Native | Tie (StreamV2/Beam Go) |
 
+### Projected State with GPU Acceleration (2025)
+| Criteria | StreamV2 + GPU | Apache Beam (Java/Python) | Apache Beam (Go) | Winner |
+|----------|-----------------|---------------------------|------------------|---------|
+| **Latency** | <10ms | 2-5 seconds | 500ms-2 seconds | StreamV2 |
+| **Math-Heavy Workloads** | **10-50x faster** | Baseline | Baseline | **StreamV2** |
+| **Medium Scale** (100GB-1TB/day) | **Competitive** | Excellent | Excellent | **Context-dependent** |
+| **Large Scale** (>10TB/day) | Limited | Excellent | Excellent | Apache Beam |
+| **Cost Efficiency** | $100-800/month | $500-5000/month | $500-5000/month | StreamV2 |
+| **Network Analytics** | **GPU-optimized** | Standard | Standard | **StreamV2** |
+| **Data Science** | **GPU-native** | JVM-based | Go-based | **StreamV2** |
+
 ## Final Recommendations
 
 ### Choose **StreamV2** if:
+
+#### Current (2024):
 - 🎯 **Data volume < 100GB/day**
 - ⚡ **Latency requirements < 1 second**  
 - 💰 **Cost optimization critical**
@@ -835,13 +999,22 @@ Growth Drivers:
 - 👥 **Small to medium team**
 - 🔧 **Go ecosystem preference**
 
+#### Additional with GPU (2025+):
+- 🧮 **Mathematical/statistical workloads** - GPU acceleration provides 10-50x speedup
+- 🌐 **Network security analytics** - Real-time pattern detection and anomaly analysis
+- 💹 **Financial real-time processing** - Low-latency trading and risk analytics
+- 🔬 **Data science pipelines** - GPU-native mathematical operations
+- 📊 **IoT sensor analysis** - High-frequency data with complex transformations
+- 🎯 **Medium-scale processing** - Up to 1TB/day for GPU-suitable workloads
+
 ### Choose **Apache Beam** if:
-- 📊 **Data volume > 1TB/day**
+- 📊 **Data volume > 1TB/day** (for non-GPU workloads)
 - 🌐 **Multi-cloud deployment required**
 - 🏗️ **Complex windowing/state management**
 - 🏢 **Enterprise compliance needs**
 - 👨‍💼 **Large engineering organization**
 - 🔧 **Need distributed execution model**
+- 📈 **String/text heavy processing** - Where GPU provides no benefit
 
 **SDK Selection within Beam:**
 - **Java/Python SDK**: Mature ecosystem, most connectors
@@ -849,11 +1022,28 @@ Growth Drivers:
 
 ### Hybrid Approach
 Consider using **both** in different parts of your architecture:
-- **StreamV2 for real-time, low-latency processing**
-- **Apache Beam for batch ETL and large-scale analytics**
+
+#### Current (2024):
+- **StreamV2 for real-time, low-latency processing** (<100GB/day)
+- **Apache Beam for batch ETL and large-scale analytics** (>1TB/day)
+
+#### Future with GPU (2025+):
+- **StreamV2 for mathematical/analytics workloads** (up to 1TB/day)
+- **StreamV2 for real-time network/financial analytics** (any scale)
+- **Apache Beam for text/string processing and petabyte-scale distributed workloads**
 
 This leverages the strengths of each system while minimizing their respective limitations.
 
+### Migration Timeline Considerations
+
+**If considering StreamV2 adoption:**
+- **Immediate (2024)**: Excellent for small-medium scale and low-latency requirements
+- **Wait for GPU (2025+)**: If your workloads are math-heavy and currently using expensive distributed solutions
+
+**If considering Apache Beam:**
+- **Choose now**: For immediate large-scale (>1TB/day) or enterprise requirements
+- **Reevaluate in 2025**: GPU-accelerated StreamV2 may change the cost/performance equation for your use case
+
 ---
 
-*This comparison is based on current capabilities as of January 2024. Both StreamV2 and Apache Beam continue to evolve rapidly.*
+*This comparison is based on current capabilities as of January 2024 and planned GPU acceleration features. Both StreamV2 and Apache Beam continue to evolve rapidly. GPU acceleration timeline is projected and subject to development priorities.*
