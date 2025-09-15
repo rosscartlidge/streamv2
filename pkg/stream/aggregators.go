@@ -318,6 +318,11 @@ func FieldMaxAgg[T Comparable](fieldName string) Aggregator[Record, *T, T] {
 	})
 }
 
+// FieldCountAgg creates an aggregator that counts records (field name is ignored but maintained for consistency)
+func FieldCountAgg(fieldName string) Aggregator[Record, int64, int64] {
+	return CountAggregator[Record]()
+}
+
 // ============================================================================
 // GENERALIZED AGGREGATES FUNCTION
 // ============================================================================
@@ -524,4 +529,9 @@ func FieldMinSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
 // FieldMaxSpec creates an aggregator that finds the maximum of a field in records
 func FieldMaxSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
 	return AggregatorSpec[Record]{Name: name, Agg: FieldMaxAgg[T](fieldName)}
+}
+
+// FieldCountSpec creates an aggregator that counts records (field name is ignored but maintained for consistency)
+func FieldCountSpec(name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: FieldCountAgg(fieldName)}
 }

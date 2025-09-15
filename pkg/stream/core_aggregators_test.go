@@ -533,3 +533,40 @@ func TestAggregates(t *testing.T) {
 		}
 	})
 }
+
+// TestFieldCountSpec tests the FieldCountSpec function
+func TestFieldCountSpec(t *testing.T) {
+	t.Run("RecordCount", func(t *testing.T) {
+		records := []Record{
+			{"id": 1, "name": "Alice", "score": 95},
+			{"id": 2, "name": "Bob", "score": 87},
+			{"id": 3, "name": "Charlie", "score": 92},
+		}
+		stream := FromSlice(records)
+		
+		// Test FieldCountSpec in GroupBy
+		result := GroupBy([]string{}, 
+			FieldCountSpec("custom_count", "id"),
+		)(stream)
+		
+		results, err := Collect(result)
+		if err != nil {
+			t.Fatalf("Failed to collect results: %v", err)
+		}
+		
+		if len(results) != 1 {
+			t.Fatalf("Expected 1 group, got %d", len(results))
+		}
+		
+		// Should have both group_count (built-in) and custom_count (our spec)
+		groupCount := GetOr(results[0], "group_count", int64(0))
+		customCount := GetOr(results[0], "custom_count", int64(0))
+		
+		if groupCount != 3 {
+			t.Errorf("Expected group_count=3, got %v", groupCount)
+		}
+		if customCount != 3 {
+			t.Errorf("Expected custom_count=3, got %v", customCount)
+		}
+	})
+}
