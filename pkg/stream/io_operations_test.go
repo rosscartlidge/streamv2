@@ -157,6 +157,143 @@ func TestTSVToStream(t *testing.T) {
 	})
 }
 
+// TestFastTSVSource tests the fast TSV implementation
+func TestFastTSVSource(t *testing.T) {
+	t.Run("BasicFastTSV", func(t *testing.T) {
+		tsvData := "name\tage\tsalary\nAlice\t30\t75000\nBob\t25\t65000"
+		reader := strings.NewReader(tsvData)
+		
+		source := NewFastTSVSource(reader)
+		stream := source.ToStream()
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("Failed to collect fast TSV stream: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		// Check first record
+		if GetOr(records[0], "name", "") != "Alice" {
+			t.Errorf("Expected name 'Alice', got %v", records[0]["name"])
+		}
+		if GetOr(records[0], "age", int64(0)) != int64(30) {
+			t.Errorf("Expected age 30, got %v", records[0]["age"])
+		}
+		if GetOr(records[0], "salary", int64(0)) != int64(75000) {
+			t.Errorf("Expected salary 75000, got %v", records[0]["salary"])
+		}
+	})
+	
+	t.Run("CustomSeparator", func(t *testing.T) {
+		pipeData := "name|age|city\nAlice|30|NYC\nBob|25|LA"
+		reader := strings.NewReader(pipeData)
+		
+		source := NewFastTSVSourceWithSeparator(reader, "|")
+		stream := source.ToStream()
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("Failed to collect pipe-delimited stream: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		if GetOr(records[0], "city", "") != "NYC" {
+			t.Errorf("Expected city 'NYC', got %v", records[0]["city"])
+		}
+	})
+	
+	t.Run("CustomHeaders", func(t *testing.T) {
+		// Data without header row
+		tsvData := "Alice\t30\tNYC\nBob\t25\tLA"
+		reader := strings.NewReader(tsvData)
+		
+		source := NewFastTSVSource(reader).WithHeaders([]string{"name", "age", "city"})
+		stream := source.ToStream()
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("Failed to collect TSV with custom headers: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		if GetOr(records[0], "name", "") != "Alice" {
+			t.Errorf("Expected name 'Alice', got %v", records[0]["name"])
+		}
+	})
+	
+	t.Run("WithoutHeader", func(t *testing.T) {
+		// Data without header row
+		tsvData := "Alice\t30\nBob\t25"
+		reader := strings.NewReader(tsvData)
+		
+		source := NewFastTSVSource(reader).WithoutHeader()
+		stream := source.ToStream()
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("Failed to collect headerless TSV: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		// Should have generated field names
+		if GetOr(records[0], "field_0", "") != "Alice" {
+			t.Errorf("Expected field_0 'Alice', got %v", records[0]["field_0"])
+		}
+		if GetOr(records[0], "field_1", int64(0)) != int64(30) {
+			t.Errorf("Expected field_1 30, got %v", records[0]["field_1"])
+		}
+	})
+}
+
+// TestFastTSVConvenienceFunctions tests the convenience functions
+func TestFastTSVConvenienceFunctions(t *testing.T) {
+	t.Run("FastTSVToStream", func(t *testing.T) {
+		tsvData := "name\tage\nAlice\t30\nBob\t25"
+		reader := strings.NewReader(tsvData)
+		
+		stream := FastTSVToStream(reader)
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("FastTSVToStream failed: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		if GetOr(records[0], "name", "") != "Alice" {
+			t.Errorf("Expected name 'Alice', got %v", records[0]["name"])
+		}
+	})
+	
+	t.Run("FastTSVToStreamWithSeparator", func(t *testing.T) {
+		data := "name;age;city\nAlice;30;NYC\nBob;25;LA"
+		reader := strings.NewReader(data)
+		
+		stream := FastTSVToStreamWithSeparator(reader, ";")
+		records, err := Collect(stream)
+		if err != nil {
+			t.Fatalf("FastTSVToStreamWithSeparator failed: %v", err)
+		}
+		
+		if len(records) != 2 {
+			t.Fatalf("Expected 2 records, got %d", len(records))
+		}
+		
+		if GetOr(records[0], "city", "") != "NYC" {
+			t.Errorf("Expected city 'NYC', got %v", records[0]["city"])
+		}
+	})
+}
+
 // TestNewCSVSink tests CSV sink creation
 func TestNewCSVSink(t *testing.T) {
 	t.Run("BasicCSVSink", func(t *testing.T) {

@@ -130,7 +130,143 @@ func (cs *CSVSource) ToStream() Stream[Record] {
 	}
 }
 
-// TSVSource creates a TSV source (Tab-Separated Values)
+// ============================================================================
+// FAST TSV SOURCES - HIGH PERFORMANCE STRING SPLITTING (NO ESCAPING)
+// ============================================================================
+
+// FastTSVSource configuration for reading delimited data with simple string splitting
+// This is much faster than CSV parsing but doesn't support escaping or quoted fields
+type FastTSVSource struct {
+	Reader    io.Reader
+	HasHeader bool
+	Separator string  // Can be any string, typically "\t" for TSV
+	Headers   []string
+}
+
+// NewFastTSVSource creates a fast TSV source using simple string splitting
+func NewFastTSVSource(reader io.Reader) *FastTSVSource {
+	return &FastTSVSource{
+		Reader:    reader,
+		HasHeader: true,
+		Separator: "\t",
+	}
+}
+
+// NewFastTSVSourceWithSeparator creates a fast delimited source with custom separator
+func NewFastTSVSourceWithSeparator(reader io.Reader, separator string) *FastTSVSource {
+	return &FastTSVSource{
+		Reader:    reader,
+		HasHeader: true,
+		Separator: separator,
+	}
+}
+
+// WithHeaders sets custom headers for the fast TSV source
+func (s *FastTSVSource) WithHeaders(headers []string) *FastTSVSource {
+	s.Headers = headers
+	s.HasHeader = false // Custom headers means no header row in data
+	return s
+}
+
+// WithoutHeader indicates the data has no header row
+func (s *FastTSVSource) WithoutHeader() *FastTSVSource {
+	s.HasHeader = false
+	return s
+}
+
+// ToStream converts the fast TSV source to a Record stream
+func (s *FastTSVSource) ToStream() Stream[Record] {
+	scanner := bufio.NewScanner(s.Reader)
+	
+	var headers []string
+	lineNumber := 0
+	
+	return func() (Record, error) {
+		for scanner.Scan() {
+			lineNumber++
+			line := scanner.Text()
+			
+			// Skip empty lines
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			
+			fields := strings.Split(line, s.Separator)
+			
+			// Handle header row
+			if lineNumber == 1 && s.HasHeader {
+				headers = fields
+				for i, header := range headers {
+					headers[i] = strings.TrimSpace(header)
+				}
+				continue
+			}
+			
+			// Use custom headers if provided
+			if len(s.Headers) > 0 {
+				headers = s.Headers
+			}
+			
+			// Generate default headers if none available
+			if len(headers) == 0 {
+				headers = make([]string, len(fields))
+				for i := range headers {
+					headers[i] = fmt.Sprintf("field_%d", i)
+				}
+			}
+			
+			// Create record
+			record := make(Record)
+			for i, field := range fields {
+				if i < len(headers) {
+					// Simple trim and type conversion
+					value := strings.TrimSpace(field)
+					record[headers[i]] = parseSimpleValue(value)
+				}
+			}
+			
+			return record, nil
+		}
+		
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("error reading TSV: %w", err)
+		}
+		
+		return nil, EOS
+	}
+}
+
+// parseSimpleValue does simple type conversion without complex CSV parsing
+func parseSimpleValue(value string) any {
+	if value == "" {
+		return ""
+	}
+	
+	// Try int64
+	if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return intVal
+	}
+	
+	// Try float64
+	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+		return floatVal
+	}
+	
+	// Try bool
+	if boolVal, err := strconv.ParseBool(value); err == nil {
+		return boolVal
+	}
+	
+	// Default to string
+	return value
+}
+
+// ============================================================================
+// LEGACY TSV SOURCES - BACKWARD COMPATIBILITY (CSV-BASED)
+// ============================================================================
+
+// TSVSource creates a TSV source (Tab-Separated Values) using CSV parser
+// Use NewFastTSVSource for better performance if you don't need CSV escaping
 func NewTSVSource(reader io.Reader) *CSVSource {
 	return &CSVSource{
 		Reader:    reader,
@@ -1225,7 +1361,26 @@ func CSVToStream(reader io.Reader) Stream[Record] {
 }
 
 // TSVToStream reads TSV from a reader and returns a Record stream
+// Now uses fast string splitting for better performance
 func TSVToStream(reader io.Reader) Stream[Record] {
+	source := NewFastTSVSource(reader)
+	return source.ToStream()
+}
+
+// FastTSVToStream reads delimited data using fast string splitting
+func FastTSVToStream(reader io.Reader) Stream[Record] {
+	source := NewFastTSVSource(reader)
+	return source.ToStream()
+}
+
+// FastTSVToStreamWithSeparator reads delimited data with custom separator
+func FastTSVToStreamWithSeparator(reader io.Reader, separator string) Stream[Record] {
+	source := NewFastTSVSourceWithSeparator(reader, separator)
+	return source.ToStream()
+}
+
+// LegacyTSVToStream reads TSV using CSV parser (for backward compatibility)
+func LegacyTSVToStream(reader io.Reader) Stream[Record] {
 	source := NewTSVSource(reader)
 	return source.ToStream()
 }
@@ -1269,6 +1424,24 @@ func TSVToStreamFromFile(filename string) (Stream[Record], error) {
 		return nil, fmt.Errorf("failed to open TSV file %s: %w", filename, err)
 	}
 	return TSVToStream(file), nil
+}
+
+// FastTSVToStreamFromFile reads TSV file using fast string splitting
+func FastTSVToStreamFromFile(filename string) (Stream[Record], error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open TSV file %s: %w", filename, err)
+	}
+	return FastTSVToStream(file), nil
+}
+
+// FastDelimitedToStreamFromFile reads delimited file with custom separator
+func FastDelimitedToStreamFromFile(filename string, separator string) (Stream[Record], error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
+	}
+	return FastTSVToStreamWithSeparator(file, separator), nil
 }
 
 func StreamToCSVFile(stream Stream[Record], filename string) error {
