@@ -74,32 +74,33 @@ func NewCachedFactory[T any](computer func() []T) StreamFactory[T] {
 // DUAL FORMAT FACTORY FOR CPU/GPU FLEXIBILITY
 // ============================================================================
 
-type DualFormatFactory[T any, N int] struct {
+type DualFormatFactory[T any] struct {
 	dataSource func() []T
 	cached     []T
 	once       sync.Once
+	batchSize  int
 }
 
-func NewDualFormatFactory[T any, N int](dataSource func() []T) *DualFormatFactory[T, N] {
-	return &DualFormatFactory[T, N]{dataSource: dataSource}
+func NewDualFormatFactory[T any](dataSource func() []T, batchSize int) *DualFormatFactory[T] {
+	return &DualFormatFactory[T]{dataSource: dataSource, batchSize: batchSize}
 }
 
-func (df *DualFormatFactory[T, N]) Stream() stream.Stream[T] {
+func (df *DualFormatFactory[T]) Stream() stream.Stream[T] {
 	df.once.Do(func() {
 		df.cached = df.dataSource()
 	})
 	return stream.FromSlice(df.cached)
 }
 
-func (df *DualFormatFactory[T, N]) Array() ([N]T, int) {
+func (df *DualFormatFactory[T]) Slice() []T {
 	df.once.Do(func() {
 		df.cached = df.dataSource()
 	})
 	
-	var arr [N]T
-	actualSize := min(len(df.cached), N)
-	copy(arr[:actualSize], df.cached)
-	return arr, actualSize
+	if len(df.cached) <= df.batchSize {
+		return df.cached
+	}
+	return df.cached[:df.batchSize]
 }
 
 // ============================================================================
@@ -161,18 +162,18 @@ func (rb *RecordBuilder) String(key string, value string) *RecordBuilder {
 	return rb
 }
 
-func (rb *RecordBuilder) StreamFactory[T any](key string, factory StreamFactory[T]) *RecordBuilder {
+func (rb *RecordBuilder) StreamFactory(key string, factory interface{}) *RecordBuilder {
 	rb.data[key] = factory
 	return rb
 }
 
-func (rb *RecordBuilder) SliceFactory[T any](key string, data []T) *RecordBuilder {
-	rb.data[key] = NewSliceFactory(data)
+func (rb *RecordBuilder) SliceFactory(key string, factory interface{}) *RecordBuilder {
+	rb.data[key] = factory
 	return rb
 }
 
-func (rb *RecordBuilder) CachedFactory[T any](key string, computer func() []T) *RecordBuilder {
-	rb.data[key] = NewCachedFactory(computer)
+func (rb *RecordBuilder) CachedFactory(key string, factory interface{}) *RecordBuilder {
+	rb.data[key] = factory
 	return rb
 }
 
@@ -222,7 +223,7 @@ func sumArray256(arr [256]float64) float64 {
 
 func main() {
 	fmt.Println("Stream Factory Prototype Demo")
-	fmt.Println("=" * 40)
+	fmt.Println("======================================")
 	
 	basicUsageExample()
 	fmt.Println()
@@ -245,7 +246,7 @@ func main() {
 // Basic stream factory usage
 func basicUsageExample() {
 	fmt.Println("1. Basic Stream Factory Usage")
-	fmt.Println("-" * 30)
+	fmt.Println("------------------------------")
 	
 	// Create record with stream factory
 	record := NewRecord().
@@ -270,7 +271,7 @@ func basicUsageExample() {
 // Demonstrate record copyability
 func copyabilityExample() {
 	fmt.Println("2. Record Copyability")
-	fmt.Println("-" * 20)
+	fmt.Println("--------------------")
 	
 	original := NewRecord().
 		String("name", "Original").
@@ -299,7 +300,7 @@ func copyabilityExample() {
 // Multiple consumers from same factory
 func multipleConsumerExample() {
 	fmt.Println("3. Multiple Stream Consumers")
-	fmt.Println("-" * 29)
+	fmt.Println("-----------------------------")
 	
 	record := NewRecord().
 		SliceFactory("numbers", []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}).
@@ -327,7 +328,7 @@ func multipleConsumerExample() {
 // Cached factory for expensive operations
 func cachedFactoryExample() {
 	fmt.Println("4. Cached Factory Example")
-	fmt.Println("-" * 25)
+	fmt.Println("-------------------------")
 	
 	// Create expensive computation factory
 	expensiveFactory := NewCachedFactory(func() []float64 {
@@ -361,16 +362,16 @@ func cachedFactoryExample() {
 // Dual format factory for CPU/GPU processing
 func dualFormatExample() {
 	fmt.Println("5. Dual Format CPU/GPU Example")
-	fmt.Println("-" * 33)
+	fmt.Println("----------------------------------")
 	
 	// Create dual format factory
-	dualFactory := NewDualFormatFactory[float64, 256](func() []float64 {
+	dualFactory := NewDualFormatFactory[float64](func() []float64 {
 		data := make([]float64, 1000)
 		for i := range data {
 			data[i] = rand.Float64() * math.Pi
 		}
 		return data
-	})
+	}, 256)
 	
 	// CPU processing - use as stream
 	cpuStream := dualFactory.Stream()
@@ -395,7 +396,7 @@ func dualFormatExample() {
 // GroupBy with stream factories
 func groupByExample() {
 	fmt.Println("6. GroupBy with Stream Factories")
-	fmt.Println("-" * 32)
+	fmt.Println("--------------------------------")
 	
 	// Create records with stream factories
 	records := []stream.Record{

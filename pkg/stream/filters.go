@@ -6,8 +6,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
-	"golang.org/x/sync/errgroup"
 )
 
 // ============================================================================
@@ -71,7 +69,9 @@ func calculateOptimalWorkers(complexity int) int {
 	baseWorkers := 4 // Conservative default
 	
 	// More workers for more complex operations
-	if complexity >= 7 {
+	if complexity >= 10 {
+		baseWorkers = 16
+	} else if complexity >= 7 {
 		baseWorkers = 8
 	} else if complexity >= 5 {
 		baseWorkers = 6
@@ -238,81 +238,53 @@ func ExtractField[T any](field string) Filter[Record, T] {
 // CONCURRENT PROCESSING
 // ============================================================================
 
-// Parallel processes elements concurrently using errgroup for proper lifecycle management
+// Parallel processes elements concurrently using simple goroutines
 func Parallel[T, U any](workers int, fn func(T) U) Filter[T, U] {
 	return func(input Stream[T]) Stream[U] {
-		ctx, cancel := context.WithCancel(context.Background())
-		g, gctx := errgroup.WithContext(ctx)
-		
 		inputCh := make(chan T, workers)
 		outputCh := make(chan U, workers)
+		workerDone := make(chan struct{}, workers)
 
-		// Start workers using errgroup
+		// Start workers
 		for i := 0; i < workers; i++ {
-			g.Go(func() error {
-				for {
-					select {
-					case <-gctx.Done():
-						return gctx.Err()
-					case item, ok := <-inputCh:
-						if !ok {
-							return nil // Input closed normally
-						}
-						// Process item with cancellation check
-						result := fn(item)
-						select {
-						case outputCh <- result:
-						case <-gctx.Done():
-							return gctx.Err()
-						}
-					}
+			go func() {
+				for item := range inputCh {
+					result := fn(item)
+					outputCh <- result
 				}
-			})
+				workerDone <- struct{}{}
+			}()
 		}
 
-		// Feed input with errgroup
-		g.Go(func() error {
-			defer close(inputCh)
-			
-			for {
-				select {
-				case <-gctx.Done():
-					return gctx.Err()
-				default:
-					item, err := input()
-					if err != nil {
-						return nil // Input stream ended normally
-					}
-					select {
-					case inputCh <- item:
-					case <-gctx.Done():
-						return gctx.Err()
-					}
-				}
-			}
-		})
-
-		// Cleanup goroutine 
+		// Feed input and manage cleanup
 		go func() {
-			g.Wait() // Wait for all goroutines to finish
+			defer close(inputCh)
+			for {
+				item, err := input()
+				if err != nil {
+					break // Input stream ended
+				}
+				inputCh <- item
+			}
+		}()
+
+		// Cleanup coordinator
+		go func() {
+			// Wait for all workers to signal completion
+			for i := 0; i < workers; i++ {
+				<-workerDone
+			}
 			close(outputCh)
 		}()
 
-		// Return cancellable stream
+		// Return simple stream
 		return func() (U, error) {
-			select {
-			case <-gctx.Done():
-				cancel() // Ensure cleanup
+			item, ok := <-outputCh
+			if !ok {
 				var zero U
-				return zero, gctx.Err()
-			case item, ok := <-outputCh:
-				if !ok {
-					cancel() // Cleanup when stream ends
-					var zero U
-					return zero, EOS
-				}
-				return item, nil
+				return zero, EOS
 			}
+			return item, nil
 		}
 	}
 }
@@ -384,17 +356,17 @@ func Tee[T any](stream Stream[T], n int) []Stream[T] {
 					select {
 					case ch <- item:
 						// Successfully sent
-					case <-time.After(5 * time.Second):
-						// Consumer too slow - mark as abandoned to prevent leak
+					case <-ctx.Done():
+						mu.RUnlock()
+						return
+					default:
+						// Channel full - consumer too slow, mark as abandoned to prevent leak
 						mu.RUnlock()
 						mu.Lock()
 						abandoned[i] = true
 						close(ch) // Close abandoned channel
 						mu.Unlock()
 						mu.RLock()
-					case <-ctx.Done():
-						mu.RUnlock()
-						return
 					}
 				}
 				mu.RUnlock()
@@ -419,8 +391,6 @@ func Tee[T any](stream Stream[T], n int) []Stream[T] {
 				return zero, ctx.Err()
 			case item, ok := <-ch:
 				if !ok {
-					// Mark this stream as done
-					cancel()
 					var zero T
 					return zero, EOS
 				}
@@ -992,10 +962,12 @@ func Split(keyFields []string) Filter[Record, Stream[Record]] {
 							}
 						}
 						
-						// Emit new substream with timeout
+						// Emit new substream 
 						select {
 						case newSubstreams <- substream:
-						case <-time.After(1 * time.Second):
+						case <-ctx.Done():
+							return
+						default:
 							// Consumer too slow, abandon this group
 							mu.Lock()
 							abandonedGroups[key] = true
@@ -1003,23 +975,21 @@ func Split(keyFields []string) Filter[Record, Stream[Record]] {
 							delete(groupChannels, key)
 							mu.Unlock()
 							continue
-						case <-ctx.Done():
-							return
 						}
 					}
 					
-					// Send record to group channel with timeout
+					// Send record to group channel with non-blocking fallback
 					select {
 					case groupChannels[key] <- record:
-					case <-time.After(5 * time.Second):
+					case <-ctx.Done():
+						return
+					default:
 						// Group consumer too slow - abandon it
 						mu.Lock()
 						abandonedGroups[key] = true
 						close(groupChannels[key])
 						delete(groupChannels, key)
 						mu.Unlock()
-					case <-ctx.Done():
-						return
 					}
 				}
 			}
@@ -1089,9 +1059,11 @@ func TimeWindow[T any](duration time.Duration) Filter[T, Stream[T]] {
 		return func() (Stream[T], error) {
 			batch := make([]T, 0)
 			deadline := time.Now().Add(duration)
+			timer := time.NewTimer(duration)
+			defer timer.Stop()
 			
-			for time.Now().Before(deadline) {
-				// Try to get next item with a small timeout
+			for {
+				// Try to get next item with deadline-based timeout
 				done := make(chan bool, 1)
 				var item T
 				var err error
@@ -1113,12 +1085,14 @@ func TimeWindow[T any](duration time.Duration) Filter[T, Stream[T]] {
 					}
 					batch = append(batch, item)
 					
-				case <-time.After(100 * time.Millisecond):
-					// Timeout - check if window expired
+					// Check if deadline passed after processing item
 					if time.Now().After(deadline) {
 						break
 					}
-					// Continue waiting
+					
+				case <-timer.C:
+					// Window expired - return what we have
+					break
 				}
 			}
 			
@@ -1154,13 +1128,18 @@ func SlidingCountWindow[T any](windowSize, stepSize int) Filter[T, Stream[T]] {
 			for len(buffer) < windowSize {
 				item, err := input()
 				if err != nil {
-					if len(buffer) == 0 {
+					// Stream ended - only return window if we have full size
+					if len(buffer) < windowSize {
 						return nil, err
 					}
-					// Partial window
 					break
 				}
 				buffer = append(buffer, item)
+			}
+			
+			// Only create window if we have full size
+			if len(buffer) < windowSize {
+				return nil, EOS
 			}
 			
 			// Create current window
@@ -1391,7 +1370,7 @@ func (vct *ValueChangeTrigger[T]) ShouldFire(element T, state any) bool {
 	if !vct.initialized {
 		vct.lastValue = currentValue
 		vct.initialized = true
-		return false // Don't fire on first element
+		return true // Fire on first element (no previous value to compare)
 	}
 	
 	if currentValue != vct.lastValue {

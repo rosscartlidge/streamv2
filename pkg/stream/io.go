@@ -820,8 +820,9 @@ func convertRecordValueToJSON(value any) any {
 
 // IsStreamType checks if a value is a Stream[T] type
 func IsStreamType(value any) bool {
-	// This is a simplified check - in practice you might want more sophisticated type checking
-	return strings.Contains(fmt.Sprintf("%T", value), "func()")
+	typeStr := fmt.Sprintf("%T", value)
+	// Stream[T] types appear as "stream.Stream[TYPE]" or as function types "func() (TYPE, error)"
+	return strings.Contains(typeStr, "stream.Stream[") || strings.Contains(typeStr, "func() (") && strings.Contains(typeStr, ", error)")
 }
 
 // collectAnyStream attempts to collect items from any stream type using reflection

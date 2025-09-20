@@ -197,7 +197,7 @@ func main() {
 			Int("order_id", orderID).
 			String("customer_name", customerName).
 			String("customer_email", customerEmail).
-			Int("item_count", itemCount).
+			Int("item_count", int64(itemCount)).
 			Float("total_amount", total).
 			Float("avg_item_value", avgItemValue).
 			String("processed_at", time.Now().Format("2006-01-02 15:04:05")).

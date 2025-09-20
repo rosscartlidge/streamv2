@@ -148,7 +148,7 @@ Charlie,35,85000.25,true`
 		return stream.NewRecord().
 			String("region", region).
 			String("product", product).
-			Int("base_amount", amount).
+			Int("base_amount", int64(amount)).
 			Float("markup", markup).
 			Float("final_price", finalPrice).
 			Build()

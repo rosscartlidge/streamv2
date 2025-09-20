@@ -102,12 +102,12 @@ func main() {
 		regions := []string{"US", "EU", "ASIA"}
 		
 		return stream.NewRecord().
-			Int("order_id", counter).
+			Int("order_id", int64(counter)).
 			Int("timestamp", time.Now().Unix()).
 			String("product", products[rand.Intn(len(products))]).
 			String("region", regions[rand.Intn(len(regions))]).
-			Int("amount", rand.Intn(400) + 100). // $100-$500
-			Int("customer_id", 1000 + rand.Intn(100)).
+			Int("amount", int64(rand.Intn(400) + 100)). // $100-$500
+			Int("customer_id", int64(1000 + rand.Intn(100))).
 			Build(), nil
 	}
 	
@@ -210,10 +210,10 @@ func main() {
 		}
 		
 		return stream.NewRecord().
-			Int("order_id", stream.GetOr(order, "order_id", 0)).
+			Int("order_id", stream.GetOr(order, "order_id", int64(0))).
 			String("product", product).
 			String("region", region).
-			Int("amount", amount).
+			Int("amount", int64(amount)).
 			Float("tax", tax).
 			Float("shipping", shipping).
 			Float("total", total).
@@ -308,8 +308,8 @@ func main() {
 		}
 		
 		analyticsResult := stream.NewRecord().
-			Int("window_id", windowNum2).
-			Int("order_count", len(windowRecords)).
+			Int("window_id", int64(windowNum2)).
+			Int("order_count", int64(len(windowRecords))).
 			Float("total_amount", totalAmount).
 			Float("total_tax", totalTax).
 			Float("total_shipping", totalShipping).

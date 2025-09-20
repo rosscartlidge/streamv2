@@ -174,12 +174,12 @@ Chair	Furniture	199.99	true`
 	sensors := []string{"temperature", "humidity", "pressure"}
 	for i := 0; i < 10; i++ {
 		sensor := sensors[i%len(sensors)]
-		record := stream.R(
-			"timestamp", time.Now().Unix(),
-			"sensor", sensor,
-			"value", 20.0 + float64(i*5),
-			"status", i%2 == 0,
-		)
+		record := stream.NewRecord().
+			Int("timestamp", time.Now().Unix()).
+			String("sensor", sensor).
+			Float("value", 20.0 + float64(i*5)).
+			Bool("status", i%2 == 0).
+			Build()
 		
 		err = streamingWriter.WriteRecord(record)
 		if err != nil {
@@ -225,14 +225,14 @@ Chair	Furniture	199.99	true`
 			tier = "Basic"
 		}
 		
-		return stream.R(
-			"original_amount", amount,
-			"tax", tax,
-			"total", total,
-			"customer", customer,
-			"tier", tier,
-			"processed_at", time.Now().Format("2006-01-02 15:04:05"),
-		)
+		return stream.NewRecord().
+			Float("original_amount", amount).
+			Float("tax", tax).
+			Float("total", total).
+			String("customer", customer).
+			String("tier", tier).
+			String("processed_at", time.Now().Format("2006-01-02 15:04:05")).
+			Build()
 	})(salesStream)
 	
 	// Write processed results
@@ -265,24 +265,28 @@ Chair	Furniture	199.99	true`
 	// Create larger dataset for windowing
 	largeDataset := make([]stream.Record, 20)
 	for i := 0; i < 20; i++ {
-		largeDataset[i] = stream.R(
-			"transaction_id", i+1,
-			"amount", float64(100 + (i*15)%200),
-			"region", []string{"US", "EU", "ASIA"}[i%3],
-		)
+		largeDataset[i] = stream.NewRecord().
+			Int("transaction_id", int64(i+1)).
+			Float("amount", float64(100 + (i*15)%200)).
+			String("region", []string{"US", "EU", "ASIA"}[i%3]).
+			Build()
 	}
 	
 	// Write large dataset
 	largeDataFile := "/tmp/large_dataset.csv"
-	err = stream.StreamToCSVFile(stream.FromSlice(largeDataset), largeDataFile)
+	largeStream, err := stream.FromRecords(largeDataset)
+	if err != nil {
+		panic(err)
+	}
+	err = stream.StreamToCSVFile(largeStream, largeDataFile)
 	if err != nil {
 		fmt.Printf("Error writing large dataset: %v\n", err)
 		return
 	}
 	
 	// Read and process in windows
-	largeStream, _ := stream.CSVToStreamFromFile(largeDataFile)
-	windowedStream := stream.CountWindow[stream.Record](5)(largeStream)
+	largeStreamRead, _ := stream.CSVToStreamFromFile(largeDataFile)
+	windowedStream := stream.CountWindow[stream.Record](5)(largeStreamRead)
 	
 	fmt.Println("Processing in windows of 5 records:")
 	windowNum := 0

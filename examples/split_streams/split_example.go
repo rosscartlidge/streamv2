@@ -30,17 +30,20 @@ func demonstrateBasicSplit() {
 
 	// Employee data with mixed departments
 	employees := []stream.Record{
-		stream.R("name", "Alice", "dept", "engineering", "salary", int64(95000)),
-		stream.R("name", "Bob", "dept", "sales", "salary", int64(85000)),
-		stream.R("name", "Charlie", "dept", "engineering", "salary", int64(87000)),
-		stream.R("name", "Diana", "dept", "marketing", "salary", int64(78000)),
-		stream.R("name", "Eve", "dept", "engineering", "salary", int64(92000)),
-		stream.R("name", "Frank", "dept", "sales", "salary", int64(83000)),
+		stream.NewRecord().String("name", "Alice").String("dept", "engineering").Int("salary", 95000).Build(),
+		stream.NewRecord().String("name", "Bob").String("dept", "sales").Int("salary", 85000).Build(),
+		stream.NewRecord().String("name", "Charlie").String("dept", "engineering").Int("salary", 87000).Build(),
+		stream.NewRecord().String("name", "Diana").String("dept", "marketing").Int("salary", 78000).Build(),
+		stream.NewRecord().String("name", "Eve").String("dept", "engineering").Int("salary", 92000).Build(),
+		stream.NewRecord().String("name", "Frank").String("dept", "sales").Int("salary", 83000).Build(),
 	}
 
 	fmt.Printf("Processing %d employees across departments...\n", len(employees))
 
-	employeeStream := stream.FromRecords(employees)
+	employeeStream, err := stream.FromRecords(employees)
+	if err != nil {
+		panic(err)
+	}
 	
 	// Split into department substreams - emits substreams as we discover new departments
 	departmentStreams := stream.Split([]string{"dept"})(employeeStream)
@@ -81,7 +84,10 @@ func demonstrateBasicSplit() {
 	}
 
 	// Consume the results to trigger processing
-	employeeStream2 := stream.FromRecords(employees)
+	employeeStream2, err := stream.FromRecords(employees)
+	if err != nil {
+		panic(err)
+	}
 	departmentStreams2 := stream.Split([]string{"dept"})(employeeStream2)
 	results, _ := stream.Collect(
 		stream.Map(func(deptStream stream.Stream[stream.Record]) string {
@@ -107,15 +113,18 @@ func demonstrateAdvancedProcessing() {
 
 	// Order data with different statuses
 	orders := []stream.Record{
-		stream.R("id", 1, "status", "pending", "amount", 150.0),
-		stream.R("id", 2, "status", "completed", "amount", 200.0),
-		stream.R("id", 3, "status", "pending", "amount", 75.0),
-		stream.R("id", 4, "status", "failed", "amount", 300.0),
-		stream.R("id", 5, "status", "completed", "amount", 125.0),
-		stream.R("id", 6, "status", "pending", "amount", 250.0),
+		stream.NewRecord().Int("id", 1).String("status", "pending").Float("amount", 150.0).Build(),
+		stream.NewRecord().Int("id", 2).String("status", "completed").Float("amount", 200.0).Build(),
+		stream.NewRecord().Int("id", 3).String("status", "pending").Float("amount", 75.0).Build(),
+		stream.NewRecord().Int("id", 4).String("status", "failed").Float("amount", 300.0).Build(),
+		stream.NewRecord().Int("id", 5).String("status", "completed").Float("amount", 125.0).Build(),
+		stream.NewRecord().Int("id", 6).String("status", "pending").Float("amount", 250.0).Build(),
 	}
 
-	orderStream := stream.FromRecords(orders)
+	orderStream, err := stream.FromRecords(orders)
+	if err != nil {
+		panic(err)
+	}
 	statusStreams := stream.Split([]string{"status"})(orderStream)
 
 	fmt.Println("Processing orders by status with custom logic:")
@@ -191,14 +200,17 @@ func demonstrateLazyEvaluation() {
 	var records []stream.Record
 	categories := []string{"A", "B", "C"}
 	for i := 0; i < 1000; i++ {
-		records = append(records, stream.R(
-			"id", i,
-			"category", categories[i%3],
-			"value", float64(i*10),
-		))
+		records = append(records, stream.NewRecord().
+			Int("id", int64(i)).
+			String("category", categories[i%3]).
+			Float("value", float64(i*10)).
+			Build())
 	}
 
-	recordStream := stream.FromRecords(records)
+	recordStream, err := stream.FromRecords(records)
+	if err != nil {
+		panic(err)
+	}
 	categoryStreams := stream.Split([]string{"category"})(recordStream)
 
 	fmt.Println("Processing each category stream independently (streaming, no buffering):")

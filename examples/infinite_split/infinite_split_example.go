@@ -107,13 +107,13 @@ func createInfiniteLogStream() stream.Stream[stream.Record] {
 			message = fmt.Sprintf("Debug trace in %s", service)
 		}
 		
-		return stream.R(
-			"timestamp", timestamp,
-			"service", service,
-			"level", level,
-			"message", message,
-			"request_id", fmt.Sprintf("req-%d", rand.Intn(10000)),
-		), nil
+		return stream.NewRecord().
+			String("timestamp", timestamp).
+			String("service", service).
+			String("level", level).
+			String("message", message).
+			String("request_id", fmt.Sprintf("req-%d", rand.Intn(10000))).
+			Build(), nil
 	}
 }
 

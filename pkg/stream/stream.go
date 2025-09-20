@@ -201,6 +201,16 @@ func (r Record) Keys() []string {
 	return keys
 }
 
+// Set creates a new Record with an additional field - immutable update
+func (r Record) Set(field string, value any) Record {
+	result := make(Record, len(r)+1)
+	for k, v := range r {
+		result[k] = v
+	}
+	result[field] = value
+	return result
+}
+
 // ============================================================================
 // SMART TYPE CONVERSION SYSTEM
 // ============================================================================

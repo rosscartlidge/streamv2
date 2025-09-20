@@ -80,7 +80,7 @@ func TestAutoParallelFilter(t *testing.T) {
 		result, err := Collect(
 			Where(func(x float64) bool {
 				// Complex predicate - should trigger auto-parallel
-				return math.Sin(x)*math.Cos(x) > 0.5
+				return math.Sin(x)*math.Cos(x) > 0.4
 			})(FromSlice(data)))
 		duration := time.Since(start)
 		
@@ -122,10 +122,10 @@ func TestAutoParallelGroupBy(t *testing.T) {
 		start := time.Now()
 		results, err := Collect(
 			GroupBy([]string{"department"},
-				FieldSumSpec[int]("total_salary", "salary"),
-				FieldAvgSpec[int]("avg_salary", "salary"),
-				FieldMaxSpec[int]("max_salary", "salary"),  // 3+ aggregators should trigger parallel
-				FieldMinSpec[int]("min_salary", "salary"),
+				FieldSumSpec[int64]("total_salary", "salary"),
+				FieldAvgSpec[int64]("avg_salary", "salary"),
+				FieldMaxSpec[int64]("max_salary", "salary"),  // 3+ aggregators should trigger parallel
+				FieldMinSpec[int64]("min_salary", "salary"),
 			)(FromSlice(data)))
 		duration := time.Since(start)
 		
@@ -142,7 +142,7 @@ func TestAutoParallelGroupBy(t *testing.T) {
 		for _, result := range results {
 			dept := GetOr(result, "department", "")
 			count := GetOr(result, "group_count", int64(0))
-			total := GetOr(result, "total_salary", 0)
+			total := GetOr(result, "total_salary", int64(0))
 			
 			if dept == "" {
 				t.Error("Expected department in group result")

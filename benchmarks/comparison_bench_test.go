@@ -272,16 +272,19 @@ func BenchmarkStreamV2_RecordProcessing(b *testing.B) {
 	// Create test records
 	records := make([]stream.Record, benchmarkSize)
 	for i := 0; i < benchmarkSize; i++ {
-		records[i] = stream.R(
-			"id", int64(i),
-			"value", float64(i)*1.5,
-			"active", i%2 == 0,
-		)
+		records[i] = stream.NewRecord().
+			Int("id", int64(i)).
+			Float("value", float64(i)*1.5).
+			Bool("active", i%2 == 0).
+			Build()
 	}
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		recordStream := stream.FromRecords(records)
+		recordStream, err := stream.FromRecords(records)
+		if err != nil {
+			b.Fatal(err)
+		}
 		processed := stream.Chain(
 			stream.Where(func(r stream.Record) bool {
 				return stream.GetOr(r, "active", false)

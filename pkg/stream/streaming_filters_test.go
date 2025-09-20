@@ -461,14 +461,14 @@ func TestStreamingGroupBy(t *testing.T) {
 		// Check that we have group information
 		found := false
 		for _, result := range results {
-			if _, exists := result["group_key"]; exists {
+			if _, exists := result["largest_group_key"]; exists {
 				found = true
 				break
 			}
 		}
 		
 		if !found {
-			t.Errorf("Expected to find group_key in results")
+			t.Errorf("Expected to find largest_group_key in results")
 		}
 	})
 }

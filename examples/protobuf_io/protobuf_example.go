@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"strings"
-	"time"
 	"github.com/rosscartlidge/streamv2/pkg/stream"
 	
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -215,7 +213,7 @@ func createUserMessageDescriptor() protoreflect.MessageDescriptor {
 	// or use generated descriptors
 	
 	// Create a basic file descriptor
-	fileDesc := &descriptorpb.FileDescriptorProto{
+	_ = &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("user.proto"),
 		Package: proto.String("example"),
 		MessageType: []*descriptorpb.DescriptorProto{

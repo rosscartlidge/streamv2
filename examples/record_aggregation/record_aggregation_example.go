@@ -73,7 +73,10 @@ func demonstrateBasicRecordAggregation() {
 		},
 	}
 	
-	recordStream := stream.FromRecords(employees)
+	recordStream, err := stream.FromRecords(employees)
+	if err != nil {
+		panic(err)
+	}
 	
 	// Use Tee to split the stream for multiple aggregations
 	streams := stream.Tee(recordStream, 3)
@@ -171,7 +174,10 @@ func demonstrateAdvancedRecordAnalytics() {
 		},
 	}
 	
-	recordStream := stream.FromRecords(employees)
+	recordStream, err := stream.FromRecords(employees)
+	if err != nil {
+		panic(err)
+	}
 	
 	// Use Tee to split the stream for multiple aggregations
 	streams := stream.Tee(recordStream, 2)
@@ -295,7 +301,10 @@ func demonstrateComplexBusinessLogic() {
 		Finalize: func(acc map[string]float64) map[string]float64 { return acc },
 	}
 	
-	recordStream := stream.FromRecords(transactions)
+	recordStream, err := stream.FromRecords(transactions)
+	if err != nil {
+		panic(err)
+	}
 	
 	// Use Tee to split the stream for multiple aggregations
 	streams := stream.Tee(recordStream, 2)

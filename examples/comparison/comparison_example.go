@@ -104,9 +104,9 @@ func demonstrateTypeSafety() {
 
 	// Sample data
 	users := []stream.Record{
-		stream.R("name", "Alice", "age", 25, "salary", 75000.0),
-		stream.R("name", "Bob", "age", 30, "salary", 85000.0),
-		stream.R("name", "Charlie", "age", 35, "salary", 95000.0),
+		stream.NewRecord().String("name", "Alice").Int("age", 25).Float("salary", 75000.0).Build(),
+		stream.NewRecord().String("name", "Bob").Int("age", 30).Float("salary", 85000.0).Build(),
+		stream.NewRecord().String("name", "Charlie").Int("age", 35).Float("salary", 95000.0).Build(),
 	}
 
 	// ========================================
@@ -124,7 +124,10 @@ func demonstrateTypeSafety() {
 	fmt.Println("maxAge, _ := stream.Max(ages)  // int, no casting needed")
 	fmt.Println("```")
 
-	userStream := stream.FromRecords(users)
+	userStream, err := stream.FromRecords(users)
+	if err != nil {
+		panic(err)
+	}
 
 	// Use Tee to split stream for multiple operations
 	streams := stream.Tee(userStream, 2)
@@ -248,11 +251,11 @@ func demonstrateComplexPipelines() {
 
 	// Sample order data
 	orders := []stream.Record{
-		stream.R("id", 1, "customer", "Alice", "amount", 150.0, "status", "completed"),
-		stream.R("id", 2, "customer", "Bob", "amount", 75.0, "status", "pending"),
-		stream.R("id", 3, "customer", "Alice", "amount", 200.0, "status", "completed"),
-		stream.R("id", 4, "customer", "Charlie", "amount", 300.0, "status", "completed"),
-		stream.R("id", 5, "customer", "Bob", "amount", 125.0, "status", "completed"),
+		stream.NewRecord().Int("id", 1).String("customer", "Alice").Float("amount", 150.0).String("status", "completed").Build(),
+		stream.NewRecord().Int("id", 2).String("customer", "Bob").Float("amount", 75.0).String("status", "pending").Build(),
+		stream.NewRecord().Int("id", 3).String("customer", "Alice").Float("amount", 200.0).String("status", "completed").Build(),
+		stream.NewRecord().Int("id", 4).String("customer", "Charlie").Float("amount", 300.0).String("status", "completed").Build(),
+		stream.NewRecord().Int("id", 5).String("customer", "Bob").Float("amount", 125.0).String("status", "completed").Build(),
 	}
 
 	// ========================================
@@ -275,7 +278,10 @@ func demonstrateComplexPipelines() {
 	fmt.Println("totalRevenue, _ := stream.Sum(revenues)")
 	fmt.Println("```")
 
-	orderStream := stream.FromRecords(orders)
+	orderStream, err := stream.FromRecords(orders)
+	if err != nil {
+		panic(err)
+	}
 
 	completedOrders := stream.Chain(
 		stream.Where(func(r stream.Record) bool {
