@@ -38,6 +38,15 @@ Thumbs.db
 /dist/
 /build/
 
+# Compiled example binaries (from go run in example directories)
+csv_tsv_io
+csv_tsv_io_flexible
+json_io
+json_stream_reuse
+protobuf_concepts
+protobuf_io
+split_streams
+
 # Logs
 *.log
 
