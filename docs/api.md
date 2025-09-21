@@ -16,6 +16,46 @@ Complete reference for all exported functions in the StreamV2 package.
 
 # Core Types
 
+## Value
+```go
+type Value interface {
+	// Integer types
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+
+	// Float types
+	~float32 | ~float64 |
+
+	// Other basic types
+	~bool | ~string | time.Time |
+
+	// Record type for nested structures
+	Record |
+
+	// Stream types for all allowed element types
+	Stream[int] | Stream[int8] | Stream[int16] | Stream[int32] | Stream[int64] |
+	Stream[uint] | Stream[uint8] | Stream[uint16] | Stream[uint32] | Stream[uint64] |
+	Stream[float32] | Stream[float64] |
+	Stream[bool] | Stream[string] | Stream[time.Time] |
+	Stream[Record]
+}
+```
+
+**The fundamental type constraint that defines what values can be stored in Records and processed by StreamV2.**
+
+This constraint ensures:
+- **Type Safety**: Only supported types can be used as Record values
+- **Performance**: No reflection needed for type operations
+- **Composability**: Streams can be nested as values in Records
+- **Interoperability**: All basic Go types plus time.Time are supported
+
+**Supported Types:**
+- All integer types (`int`, `int8`, `int16`, `int32`, `int64`, `uint`, `uint8`, `uint16`, `uint32`, `uint64`)
+- All float types (`float32`, `float64`)
+- Basic types (`bool`, `string`, `time.Time`)
+- Nested records (`Record`)
+- Streams of any supported element type (`Stream[T]` where T is any supported type)
+
 ## Stream[T]
 ```go
 type Stream[T any] func() (T, error)
@@ -24,9 +64,9 @@ The fundamental stream type. A function that returns the next element and an err
 
 ## Record
 ```go
-type Record map[string]any
+type Record map[string]Value
 ```
-A record represents a row of data with named fields. Used for CSV, JSON, and structured data processing.
+A record represents a row of data with named fields. Each field value must satisfy the `Value` constraint. Used for CSV, JSON, and structured data processing.
 
 ## Filter[T, U]
 ```go

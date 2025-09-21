@@ -82,7 +82,7 @@ func demonstrateRealtimeLogProcessing() {
 // ============================================================================
 
 func createInfiniteLogStream() stream.Stream[stream.Record] {
-	services := []string{"auth", "api", "database", "cache", "frontend"}
+	services := []string{"auth", "api", "database", "cache", "frontend", "STOP"}
 	levels := []string{"INFO", "WARN", "ERROR", "DEBUG"}
 	
 	return func() (stream.Record, error) {
@@ -91,6 +91,11 @@ func createInfiniteLogStream() stream.Stream[stream.Record] {
 		
 		// Generate random log entry
 		service := services[rand.Intn(len(services))]
+		// When STOP selected "infinite" stream ends for demo purposes.
+		if service == "STOP" {
+			var zero stream.Record
+			return zero, stream.EOS
+		}
 		level := levels[rand.Intn(len(levels))]
 		timestamp := time.Now().Format("15:04:05")
 		

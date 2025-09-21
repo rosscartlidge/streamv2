@@ -45,21 +45,31 @@ func main() {
 
 ### **Traditional Go**
 ```go
-// Verbose and error-prone
-var sum int
-for _, item := range data {
-    if item.Value > threshold {
-        sum += item.Value * item.Value
+// Group employees by department and calculate averages - lots of code!
+deptSalaries := make(map[string][]float64)
+for _, emp := range employees {
+    dept := emp["department"].(string)
+    salary := emp["salary"].(float64)
+    deptSalaries[dept] = append(deptSalaries[dept], salary)
+}
+
+deptAverages := make(map[string]float64)
+for dept, salaries := range deptSalaries {
+    var sum float64
+    for _, salary := range salaries {
+        sum += salary
     }
+    deptAverages[dept] = sum / float64(len(salaries))
 }
 ```
 
 ### **StreamV2**
 ```go
-// Clean and type-safe
-sum, _ := stream.Sum(
-    stream.Map(func(x int) int { return x * x })(
-        stream.Where(func(x int) bool { return x > threshold })(data)))
+// Same result in one line!
+results, _ := stream.Collect(
+    stream.GroupBy([]string{"department"},
+        stream.AvgField[float64]("avg_salary", "salary"),
+    )(employeeStream))
 ```
 
 ## 📊 **Working with Structured Data**
@@ -157,8 +167,10 @@ summary, _ := stream.Aggregates(
 
 StreamV2 has just three main types:
 - **`Stream[T]`** - A sequence of values of type T
-- **`Filter[T, U]`** - Transforms Stream[T] to Stream[U] 
+- **`Filter[T, U]`** - Transforms Stream[T] to Stream[U]
 - **`Record`** - Structured data (like a database row)
+
+Records can store any Go basic type (int, string, bool, etc.), nested Records, or even Streams. This gives you complete flexibility while maintaining type safety.
 
 Everything else builds on these simple foundations.
 
