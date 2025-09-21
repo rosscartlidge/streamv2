@@ -163,9 +163,9 @@ Charlie,35,85000.25,true`
 	// Stage 3: Read and summarize by region
 	stage2ReadStream := stream.CSVToStream(&stage2Buffer)
 	results, _ := stream.Collect(
-		stream.GroupBy([]string{"region"}, 
-			stream.FieldSumSpec[float64]("total_sales", "final_price"),
-			stream.FieldAvgSpec[float64]("avg_price", "final_price"),
+		stream.GroupBy([]string{"region"},
+			stream.SumField[float64]("total_sales", "final_price"),
+			stream.AvgField[float64]("avg_price", "final_price"),
 		)(stage2ReadStream),
 	)
 	

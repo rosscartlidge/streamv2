@@ -266,9 +266,9 @@ func main() {
 	
 	// Group by region with aggregations
 	results, _ := stream.Collect(
-		stream.GroupBy([]string{"region"}, 
-			stream.FieldSumSpec[float64]("total_sales", "amount"),
-			stream.FieldAvgSpec[float64]("avg_order", "amount"),
+		stream.GroupBy([]string{"region"},
+			stream.SumField[float64]("total_sales", "amount"),
+			stream.AvgField[float64]("avg_order", "amount"),
 		)(reloadedStream),
 	)
 	

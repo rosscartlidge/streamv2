@@ -164,8 +164,8 @@ func demonstrateAdvancedProcessing() {
 				// For completed orders: calculate metrics
 				amounts := stream.ExtractField[float64]("amount")(fullStream)
 				stats, _ := stream.Aggregates(amounts,
-					stream.CountSpec[float64]("count"),
-					stream.AvgSpec[float64]("average"),
+					stream.CountStream[float64]("count"),
+					stream.AvgStream[float64]("average"),
 				)
 				return fmt.Sprintf("  ✅ Completed: %d orders, $%.0f avg (revenue recognized)", 
 					stats["count"], stats["average"])

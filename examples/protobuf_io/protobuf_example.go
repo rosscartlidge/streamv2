@@ -174,8 +174,8 @@ func main() {
 	// Group by department
 	results, _ := stream.Collect(
 		stream.GroupBy([]string{"department"},
-			stream.FieldSumSpec[float64]("total_salary", "salary"),
-			stream.FieldAvgSpec[float64]("avg_salary", "salary"),
+			stream.SumField[float64]("total_salary", "salary"),
+			stream.AvgField[float64]("avg_salary", "salary"),
 		)(departmentStream),
 	)
 	

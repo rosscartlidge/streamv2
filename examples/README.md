@@ -17,7 +17,7 @@ Demonstrates the powerful data transformation capabilities of DotFlatten and Cro
 
 **Run Example**:
 ```bash
-go run stream_examples/flatten_examples/main.go
+go run examples/flatten_examples/main.go
 ```
 
 ### Join Examples  
@@ -35,7 +35,7 @@ Demonstrates all four SQL-style join operations with hash join algorithm:
 
 **Run Example**:
 ```bash
-go run stream_examples/join_examples/main.go
+go run examples/join_examples/main.go
 ```
 
 ## Key Features Demonstrated
@@ -85,10 +85,10 @@ go run stream_examples/join_examples/main.go
 2. **Run Examples**:
    ```bash
    # Flatten operations
-   go run stream_examples/flatten_examples/main.go
-   
-   # Join operations  
-   go run stream_examples/join_examples/main.go
+   go run examples/flatten_examples/main.go
+
+   # Join operations
+   go run examples/join_examples/main.go
    ```
 
 3. **Experiment**: Modify the examples to test different scenarios and data structures.

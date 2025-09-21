@@ -36,12 +36,12 @@ func generateTestData(size int) []int64 {
 
 func BenchmarkStreamV2_Map(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
 		mapped := stream.Map(func(x int64) int64 { return x * 2 })(dataStream)
-		
+
 		// Consume the stream
 		_, _ = stream.Collect(mapped)
 	}
@@ -49,12 +49,12 @@ func BenchmarkStreamV2_Map(b *testing.B) {
 
 func BenchmarkGoStreams_Map_Simulated(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate go-streams overhead:
 		// 1. Box each int64 to interface{}
-		// 2. Type assert back to int64  
+		// 2. Type assert back to int64
 		// 3. Box result back to interface{}
 		result := make([]interface{}, len(data))
 		for j, val := range data {
@@ -63,7 +63,7 @@ func BenchmarkGoStreams_Map_Simulated(b *testing.B) {
 			unboxed := boxed.(int64)
 			result[j] = interface{}(unboxed * 2)
 		}
-		
+
 		// Simulate consumption
 		for _, val := range result {
 			_ = val.(int64) // Type assertion on consumption
@@ -77,12 +77,12 @@ func BenchmarkGoStreams_Map_Simulated(b *testing.B) {
 
 func BenchmarkStreamV2_Filter(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
 		filtered := stream.Where(func(x int64) bool { return x%2 == 0 })(dataStream)
-		
+
 		// Consume the stream
 		_, _ = stream.Collect(filtered)
 	}
@@ -90,7 +90,7 @@ func BenchmarkStreamV2_Filter(b *testing.B) {
 
 func BenchmarkGoStreams_Filter_Simulated(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate go-streams overhead with filtering
@@ -102,7 +102,7 @@ func BenchmarkGoStreams_Filter_Simulated(b *testing.B) {
 				result = append(result, interface{}(unboxed))
 			}
 		}
-		
+
 		// Consume results
 		for _, val := range result {
 			_ = val.(int64)
@@ -116,7 +116,7 @@ func BenchmarkGoStreams_Filter_Simulated(b *testing.B) {
 
 func BenchmarkStreamV2_ChainedOps(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
@@ -125,7 +125,7 @@ func BenchmarkStreamV2_ChainedOps(b *testing.B) {
 			stream.Map(func(x int64) int64 { return x * x }),
 			stream.Take[int64](1000),
 		)(dataStream)
-		
+
 		// Consume the stream
 		_, _ = stream.Collect(processed)
 	}
@@ -133,12 +133,12 @@ func BenchmarkStreamV2_ChainedOps(b *testing.B) {
 
 func BenchmarkGoStreams_ChainedOps_Simulated(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate chained go-streams operations
 		intermediate := make([]interface{}, 0, len(data)/2)
-		
+
 		// Filter step
 		for _, val := range data {
 			var boxed interface{} = val
@@ -147,14 +147,14 @@ func BenchmarkGoStreams_ChainedOps_Simulated(b *testing.B) {
 				intermediate = append(intermediate, interface{}(unboxed))
 			}
 		}
-		
+
 		// Map step
 		mapped := make([]interface{}, len(intermediate))
 		for j, val := range intermediate {
 			unboxed := val.(int64)
 			mapped[j] = interface{}(unboxed * unboxed)
 		}
-		
+
 		// Take step
 		var result []interface{}
 		limit := 1000
@@ -162,7 +162,7 @@ func BenchmarkGoStreams_ChainedOps_Simulated(b *testing.B) {
 			limit = len(mapped)
 		}
 		result = mapped[:limit]
-		
+
 		// Consume
 		for _, val := range result {
 			_ = val.(int64)
@@ -176,7 +176,7 @@ func BenchmarkGoStreams_ChainedOps_Simulated(b *testing.B) {
 
 func BenchmarkStreamV2_Sum(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
@@ -186,7 +186,7 @@ func BenchmarkStreamV2_Sum(b *testing.B) {
 
 func BenchmarkGoStreams_Sum_Simulated(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate go-streams sum with interface{} overhead
@@ -202,23 +202,23 @@ func BenchmarkGoStreams_Sum_Simulated(b *testing.B) {
 
 func BenchmarkStreamV2_MultiAggregate(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		dataStream := stream.FromSlice(data)
 		_, _ = stream.Aggregates(dataStream,
-			stream.CountSpec[int64]("count"),
-			stream.SumSpec[int64]("sum"),
-			stream.MinSpec[int64]("min"),
-			stream.MaxSpec[int64]("max"),
-			stream.AvgSpec[int64]("avg"),
+			stream.CountStream[int64]("count"),
+			stream.SumStream[int64]("sum"),
+			stream.MinStream[int64]("min"),
+			stream.MaxStream[int64]("max"),
+			stream.AvgStream[int64]("avg"),
 		)
 	}
 }
 
 func BenchmarkGoStreams_MultiAggregate_Simulated(b *testing.B) {
 	data := generateTestData(benchmarkSize)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate multiple passes required by go-streams
@@ -229,15 +229,15 @@ func BenchmarkGoStreams_MultiAggregate_Simulated(b *testing.B) {
 			_ = boxed.(int64) // Type assertion
 			count++
 		}
-		
-		// Pass 2: Sum  
+
+		// Pass 2: Sum
 		var sum int64
 		for _, val := range data {
 			var boxed interface{} = val
 			unboxed := boxed.(int64)
 			sum += unboxed
 		}
-		
+
 		// Pass 3: Min
 		var min int64 = data[0]
 		for _, val := range data[1:] {
@@ -247,7 +247,7 @@ func BenchmarkGoStreams_MultiAggregate_Simulated(b *testing.B) {
 				min = unboxed
 			}
 		}
-		
+
 		// Pass 4: Max
 		var max int64 = data[0]
 		for _, val := range data[1:] {
@@ -257,7 +257,7 @@ func BenchmarkGoStreams_MultiAggregate_Simulated(b *testing.B) {
 				max = unboxed
 			}
 		}
-		
+
 		// Compute average
 		avg := float64(sum) / float64(count)
 		_, _, _, _, _ = count, sum, min, max, avg
@@ -278,7 +278,7 @@ func BenchmarkStreamV2_RecordProcessing(b *testing.B) {
 			Bool("active", i%2 == 0).
 			Build()
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		recordStream, err := stream.FromRecords(records)
@@ -294,7 +294,7 @@ func BenchmarkStreamV2_RecordProcessing(b *testing.B) {
 				return r.Set("doubled", value*2)
 			}),
 		)(recordStream)
-		
+
 		// Consume stream
 		_, _ = stream.Collect(processed)
 	}
@@ -310,37 +310,37 @@ func BenchmarkGoStreams_RecordProcessing_Simulated(b *testing.B) {
 			"active": i%2 == 0,
 		}
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		result := make([]interface{}, 0, len(records)/2)
-		
+
 		for _, record := range records {
 			// Simulate go-streams record processing
 			recordMap := record.(map[string]interface{})
-			
+
 			// Filter step
 			active, ok := recordMap["active"].(bool)
 			if !ok || !active {
 				continue
 			}
-			
+
 			// Transform step
 			value, ok := recordMap["value"].(float64)
 			if !ok {
 				value = 0.0
 			}
-			
+
 			// Create new record
 			newRecord := make(map[string]interface{})
 			for k, v := range recordMap {
 				newRecord[k] = v
 			}
 			newRecord["doubled"] = value * 2
-			
+
 			result = append(result, newRecord)
 		}
-		
+
 		// Consume results
 		for _, record := range result {
 			_ = record.(map[string]interface{})
@@ -354,7 +354,7 @@ func BenchmarkGoStreams_RecordProcessing_Simulated(b *testing.B) {
 
 func BenchmarkStreamV2_MemoryEfficiency(b *testing.B) {
 	data := generateTestData(10000) // Smaller dataset for memory testing
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// StreamV2 uses direct types, minimal allocations
@@ -367,7 +367,7 @@ func BenchmarkStreamV2_MemoryEfficiency(b *testing.B) {
 
 func BenchmarkGoStreams_MemoryEfficiency_Simulated(b *testing.B) {
 	data := generateTestData(10000)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Simulate go-streams memory overhead
@@ -376,14 +376,14 @@ func BenchmarkGoStreams_MemoryEfficiency_Simulated(b *testing.B) {
 		for j, val := range data {
 			boxed[j] = interface{}(val)
 		}
-		
+
 		// Process with interface{} overhead
 		results := make([]interface{}, len(boxed))
 		for j, val := range boxed {
 			unboxed := val.(int64)
 			results[j] = interface{}(unboxed * 2)
 		}
-		
+
 		// Unbox for final consumption
 		final := make([]int64, len(results))
 		for j, val := range results {
