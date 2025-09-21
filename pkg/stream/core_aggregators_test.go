@@ -505,11 +505,11 @@ func TestAggregates(t *testing.T) {
 		stream := FromSlice(input)
 		
 		result, err := Aggregates(stream,
-			SumSpec[int64]("total"),
-			CountSpec[int64]("count"),
-			MinSpec[int64]("minimum"),
-			MaxSpec[int64]("maximum"),
-			AvgSpec[int64]("average"),
+			SumStream[int64]("total"),
+			CountStream[int64]("count"),
+			MinStream[int64]("minimum"),
+			MaxStream[int64]("maximum"),
+			AvgStream[int64]("average"),
 		)
 		
 		if err != nil {
@@ -534,8 +534,8 @@ func TestAggregates(t *testing.T) {
 	})
 }
 
-// TestFieldCountSpec tests the FieldCountSpec function
-func TestFieldCountSpec(t *testing.T) {
+// TestCountField tests the CountField function
+func TestCountField(t *testing.T) {
 	t.Run("RecordCount", func(t *testing.T) {
 		records := []Record{
 			{"id": 1, "name": "Alice", "score": 95},
@@ -544,9 +544,9 @@ func TestFieldCountSpec(t *testing.T) {
 		}
 		stream := FromSlice(records)
 		
-		// Test FieldCountSpec in GroupBy
+		// Test CountField in GroupBy
 		result := GroupBy([]string{}, 
-			FieldCountSpec("custom_count", "id"),
+			CountField("custom_count", "id"),
 		)(stream)
 		
 		results, err := Collect(result)
@@ -558,13 +558,9 @@ func TestFieldCountSpec(t *testing.T) {
 			t.Fatalf("Expected 1 group, got %d", len(results))
 		}
 		
-		// Should have both group_count (built-in) and custom_count (our spec)
-		groupCount := GetOr(results[0], "group_count", int64(0))
+		// Should have custom_count (our explicit spec)
 		customCount := GetOr(results[0], "custom_count", int64(0))
 		
-		if groupCount != 3 {
-			t.Errorf("Expected group_count=3, got %v", groupCount)
-		}
 		if customCount != 3 {
 			t.Errorf("Expected custom_count=3, got %v", customCount)
 		}

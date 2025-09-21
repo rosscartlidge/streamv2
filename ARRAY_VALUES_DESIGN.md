@@ -507,7 +507,7 @@ func ParallelMapArray64[T, U any](workers int, fn func(T) U, arr [64]T) [64]U {
 package stream
 
 // Array-specific aggregators for GroupBy
-func ArraySumSpec4[T Numeric](name string) AggregatorSpec[Record] {
+func ArraySumStream4[T Numeric](name string) AggregatorSpec[Record] {
     return AggregatorSpec[Record]{
         Name: name,
         Agg: Aggregator[Record, T, T]{
@@ -523,7 +523,7 @@ func ArraySumSpec4[T Numeric](name string) AggregatorSpec[Record] {
     }
 }
 
-func ArrayAvgSpec16[T Numeric](name string) AggregatorSpec[Record] {
+func ArrayAvgStream16[T Numeric](name string) AggregatorSpec[Record] {
     return AggregatorSpec[Record]{
         Name: name,
         Agg: Aggregator[Record, [2]float64, float64]{

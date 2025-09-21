@@ -75,7 +75,8 @@ func main() {
 		// Group by region within window
 		groupedResults, _ := stream.Collect(
 			stream.GroupBy([]string{"region"}, 
-				stream.FieldSumSpec[float64]("total_amount", "amount"),
+				stream.SumField[float64]("total_amount", "amount"),
+				stream.CountField("count", "region"),
 			)(window),
 		)
 		
@@ -83,7 +84,7 @@ func main() {
 		for _, result := range groupedResults {
 			region := stream.GetOr(result, "region", "")
 			total := stream.GetOr(result, "total_amount", 0.0)
-			count := stream.GetOr(result, "group_count", int64(0))
+			count := stream.GetOr(result, "count", int64(0))
 			fmt.Printf("    %s: %d sales, total=$%.0f\n", region, count, total)
 		}
 	}

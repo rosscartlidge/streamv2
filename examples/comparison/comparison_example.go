@@ -116,7 +116,7 @@ func demonstrateTypeSafety() {
 	fmt.Println("```go")
 	fmt.Println("// Type-safe field extraction")
 	fmt.Println("salaries := stream.ExtractField[float64](\"salary\")(userStream)")
-	fmt.Println("stats, _ := stream.Aggregates(salaries, stream.AvgSpec[float64](\"avg\"))")
+	fmt.Println("stats, _ := stream.Aggregates(salaries, stream.AvgStream[float64](\"avg\"))")
 	fmt.Println("avgSalary := stats[\"avg\"].(float64)  // float64, guaranteed")
 	fmt.Println("")
 	fmt.Println("// Compile-time verification")
@@ -133,7 +133,7 @@ func demonstrateTypeSafety() {
 	streams := stream.Tee(userStream, 2)
 
 	salaries := stream.ExtractField[float64]("salary")(streams[0])
-	salaryStats, _ := stream.Aggregates(salaries, stream.AvgSpec[float64]("average"))
+	salaryStats, _ := stream.Aggregates(salaries, stream.AvgStream[float64]("average"))
 	avgSalary := salaryStats["average"].(float64)
 
 	ages := stream.ExtractField[int]("age")(streams[1])
@@ -187,21 +187,21 @@ func demonstrateAggregations() {
 	fmt.Println("```go")
 	fmt.Println("// Single pass through data with multiple aggregations")
 	fmt.Println("stats, _ := stream.Aggregates(salesStream,")
-	fmt.Println("    stream.CountSpec[int64](\"transactions\"),")
-	fmt.Println("    stream.SumSpec[int64](\"total_sales\"),")
-	fmt.Println("    stream.AvgSpec[int64](\"average\"),")
-	fmt.Println("    stream.MinSpec[int64](\"minimum\"),")
-	fmt.Println("    stream.MaxSpec[int64](\"maximum\"),")
+	fmt.Println("    stream.CountStream[int64](\"transactions\"),")
+	fmt.Println("    stream.SumStream[int64](\"total_sales\"),")
+	fmt.Println("    stream.AvgStream[int64](\"average\"),")
+	fmt.Println("    stream.MinStream[int64](\"minimum\"),")
+	fmt.Println("    stream.MaxStream[int64](\"maximum\"),")
 	fmt.Println(")")
 	fmt.Println("```")
 
 	salesStream := stream.FromSlice(salesData)
 	stats, _ := stream.Aggregates(salesStream,
-		stream.CountSpec[int64]("transactions"),
-		stream.SumSpec[int64]("total_sales"),
-		stream.AvgSpec[int64]("average"),
-		stream.MinSpec[int64]("minimum"),
-		stream.MaxSpec[int64]("maximum"),
+		stream.CountStream[int64]("transactions"),
+		stream.SumStream[int64]("total_sales"),
+		stream.AvgStream[int64]("average"),
+		stream.MinStream[int64]("minimum"),
+		stream.MaxStream[int64]("maximum"),
 	)
 
 	fmt.Printf("📊 Sales Statistics:\n")

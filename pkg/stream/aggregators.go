@@ -286,40 +286,40 @@ func CountAggregator[I any]() Aggregator[I, int64, int64] {
 // FIELD AGGREGATORS - operate on Record streams by extracting fields
 // ============================================================================
 
-// FieldSumAgg creates an aggregator that sums a numeric field in records
-func FieldSumAgg[T Numeric](fieldName string) Aggregator[Record, T, T] {
+// SumAggregatorField creates an aggregator that sums a numeric field in records
+func SumAggregatorField[T Numeric](fieldName string) Aggregator[Record, T, T] {
 	return SumAggregator[Record, T](func(r Record) T {
 		var zero T
 		return GetOr(r, fieldName, zero)
 	})
 }
 
-// FieldAvgAgg creates an aggregator that averages a numeric field in records
-func FieldAvgAgg[T Numeric](fieldName string) Aggregator[Record, [2]float64, float64] {
+// AvgAggregatorField creates an aggregator that averages a numeric field in records
+func AvgAggregatorField[T Numeric](fieldName string) Aggregator[Record, [2]float64, float64] {
 	return AvgAggregator[Record, T](func(r Record) T {
 		var zero T
 		return GetOr(r, fieldName, zero)
 	})
 }
 
-// FieldMinAgg creates an aggregator that finds the minimum of a field in records
-func FieldMinAgg[T Comparable](fieldName string) Aggregator[Record, *T, T] {
+// MinAggregatorField creates an aggregator that finds the minimum of a field in records
+func MinAggregatorField[T Comparable](fieldName string) Aggregator[Record, *T, T] {
 	return MinAggregator[Record, T](func(r Record) T {
 		var zero T
 		return GetOr(r, fieldName, zero)
 	})
 }
 
-// FieldMaxAgg creates an aggregator that finds the maximum of a field in records
-func FieldMaxAgg[T Comparable](fieldName string) Aggregator[Record, *T, T] {
+// MaxAggregatorField creates an aggregator that finds the maximum of a field in records
+func MaxAggregatorField[T Comparable](fieldName string) Aggregator[Record, *T, T] {
 	return MaxAggregator[Record, T](func(r Record) T {
 		var zero T
 		return GetOr(r, fieldName, zero)
 	})
 }
 
-// FieldCountAgg creates an aggregator that counts records (field name is ignored but maintained for consistency)
-func FieldCountAgg(fieldName string) Aggregator[Record, int64, int64] {
+// CountAggregatorField creates an aggregator that counts records (field name is ignored but maintained for consistency)
+func CountAggregatorField(fieldName string) Aggregator[Record, int64, int64] {
 	return CountAggregator[Record]()
 }
 
@@ -376,23 +376,23 @@ func Aggregates[T any](stream Stream[T], specs ...AggregatorSpec[T]) (Record, er
 }
 
 // Helper functions to create aggregator specs
-func SumSpec[T Numeric](name string) AggregatorSpec[T] {
+func SumStream[T Numeric](name string) AggregatorSpec[T] {
 	return AggregatorSpec[T]{Name: name, Agg: SumAggregator[T, T](func(val T) T { return val })}
 }
 
-func CountSpec[T any](name string) AggregatorSpec[T] {
+func CountStream[T any](name string) AggregatorSpec[T] {
 	return AggregatorSpec[T]{Name: name, Agg: CountAggregator[T]()}
 }
 
-func MinSpec[T Comparable](name string) AggregatorSpec[T] {
+func MinStream[T Comparable](name string) AggregatorSpec[T] {
 	return AggregatorSpec[T]{Name: name, Agg: MinAggregator[T, T](func(val T) T { return val })}
 }
 
-func MaxSpec[T Comparable](name string) AggregatorSpec[T] {
+func MaxStream[T Comparable](name string) AggregatorSpec[T] {
 	return AggregatorSpec[T]{Name: name, Agg: MaxAggregator[T, T](func(val T) T { return val })}
 }
 
-func AvgSpec[T Numeric](name string) AggregatorSpec[T] {
+func AvgStream[T Numeric](name string) AggregatorSpec[T] {
 	return AggregatorSpec[T]{Name: name, Agg: AvgAggregator[T, T](func(val T) T { return val })}
 }
 
@@ -410,16 +410,16 @@ func CustomSpec[T, A, R any](name string, agg Aggregator[T, A, R]) AggregatorSpe
 //
 // Returns one record per group containing:
 //   - The key fields from the group
-//   - "group_count": number of records in the group
 //   - Any additional aggregations specified
 //
 // Example:
 //   grouped := stream.GroupBy([]string{"department"})(users)
-//   // Each result contains: department, group_count
+//   // Each result contains: department
 //
-//   groupedWithAvg := stream.GroupBy([]string{"department"}, 
-//       stream.AvgSpec[float64]("avg_salary"))(users)
-//   // Each result contains: department, group_count, avg_salary
+//   groupedWithStats := stream.GroupBy([]string{"department"}, 
+//       stream.AvgField[float64]("avg_salary", "salary"),
+//       stream.CountField("count", "name"))(users)
+//   // Each result contains: department, avg_salary, count
 // GroupBy groups records and applies custom aggregations to each group
 func GroupBy(keyFields []string, aggregators ...AggregatorSpec[Record]) Filter[Record, Record] {
 	return func(input Stream[Record]) Stream[Record] {
@@ -451,8 +451,6 @@ func GroupBy(keyFields []string, aggregators ...AggregatorSpec[Record]) Filter[R
 				}
 			}
 
-			// Add group count
-			result["group_count"] = int64(len(groupRecords))
 
 			// Apply custom aggregations to this group
 			if len(aggregators) > 0 {
@@ -511,27 +509,27 @@ func buildGroupKey(record Record, keyFields []string) string {
 // RECORD FIELD AGGREGATIONS - FOR GROUPBY
 // ============================================================================
 
-// FieldSumSpec creates an aggregator that sums a numeric field in records
-func FieldSumSpec[T Numeric](name, fieldName string) AggregatorSpec[Record] {
-	return AggregatorSpec[Record]{Name: name, Agg: FieldSumAgg[T](fieldName)}
+// SumField creates an aggregator that sums a numeric field in records
+func SumField[T Numeric](name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: SumAggregatorField[T](fieldName)}
 }
 
-// FieldAvgSpec creates an aggregator that averages a numeric field in records
-func FieldAvgSpec[T Numeric](name, fieldName string) AggregatorSpec[Record] {
-	return AggregatorSpec[Record]{Name: name, Agg: FieldAvgAgg[T](fieldName)}
+// AvgField creates an aggregator that averages a numeric field in records
+func AvgField[T Numeric](name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: AvgAggregatorField[T](fieldName)}
 }
 
-// FieldMinSpec creates an aggregator that finds the minimum of a field in records
-func FieldMinSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
-	return AggregatorSpec[Record]{Name: name, Agg: FieldMinAgg[T](fieldName)}
+// MinField creates an aggregator that finds the minimum of a field in records
+func MinField[T Comparable](name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: MinAggregatorField[T](fieldName)}
 }
 
-// FieldMaxSpec creates an aggregator that finds the maximum of a field in records
-func FieldMaxSpec[T Comparable](name, fieldName string) AggregatorSpec[Record] {
-	return AggregatorSpec[Record]{Name: name, Agg: FieldMaxAgg[T](fieldName)}
+// MaxField creates an aggregator that finds the maximum of a field in records
+func MaxField[T Comparable](name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: MaxAggregatorField[T](fieldName)}
 }
 
-// FieldCountSpec creates an aggregator that counts records (field name is ignored but maintained for consistency)
-func FieldCountSpec(name, fieldName string) AggregatorSpec[Record] {
-	return AggregatorSpec[Record]{Name: name, Agg: FieldCountAgg(fieldName)}
+// CountField creates an aggregator that counts records (field name is ignored but maintained for consistency)
+func CountField(name, fieldName string) AggregatorSpec[Record] {
+	return AggregatorSpec[Record]{Name: name, Agg: CountAggregatorField(fieldName)}
 }

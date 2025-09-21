@@ -25,7 +25,7 @@
 | Generalized Aggregators | ✅ Complete | 100% | Custom aggregator framework |
 | Multiple Aggregates | ✅ Complete | 100% | Simultaneous aggregation runs |
 | Record Aggregation | ✅ Complete | 100% | Complex business logic aggregation |
-| Field Aggregation Specs | ✅ Complete | 100% | `FieldSumSpec`, `FieldAvgSpec`, etc. |
+| Field Aggregation Specs | ✅ Complete | 100% | `SumField`, `AvgField`, etc. |
 
 #### **📁 I/O Format Support**
 | Format | Read | Write | Streaming | Schema Support |

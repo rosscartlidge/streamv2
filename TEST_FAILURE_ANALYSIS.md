@@ -86,7 +86,7 @@ The salary field extraction or aggregation logic isn't working correctly. All de
 ### **Fix Strategy**
 1. Check field name mapping in the test data
 2. Verify aggregator field extraction logic
-3. Ensure the `FieldSumAgg` function is accessing the correct field names
+3. Ensure the `SumAggregatorField` function is accessing the correct field names
 4. Debug the generated employee records to ensure salary field is populated
 
 ---

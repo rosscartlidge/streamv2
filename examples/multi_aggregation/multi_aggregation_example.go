@@ -40,11 +40,11 @@ func demonstrateBasicMultiAggregation() {
 	// Reset stream
 	scores = stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
 	stats, err := stream.Aggregates(scores,
-		stream.CountSpec[int64]("count"),
-		stream.SumSpec[int64]("sum"), 
-		stream.MinSpec[int64]("min"),
-		stream.MaxSpec[int64]("max"),
-		stream.AvgSpec[int64]("avg"),
+		stream.CountStream[int64]("count"),
+		stream.SumStream[int64]("sum"), 
+		stream.MinStream[int64]("min"),
+		stream.MaxStream[int64]("max"),
+		stream.AvgStream[int64]("avg"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -59,8 +59,8 @@ func demonstrateBasicMultiAggregation() {
 	fmt.Println("\nSolution 2: Two specific aggregations")
 	scores2 := stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
 	results, err := stream.Aggregates(scores2,
-		stream.SumSpec[int64]("total"),
-		stream.CountSpec[int64]("count"),
+		stream.SumStream[int64]("total"),
+		stream.CountStream[int64]("count"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -71,7 +71,7 @@ func demonstrateBasicMultiAggregation() {
 
 	fmt.Println("\nSolution 3: Single Average")
 	scores3 := stream.FromSlice([]int64{95, 87, 92, 88, 91, 76, 84, 89, 93, 78})
-	avgResult, err := stream.Aggregates(scores3, stream.AvgSpec[int64]("average"))
+	avgResult, err := stream.Aggregates(scores3, stream.AvgStream[int64]("average"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -144,11 +144,11 @@ func demonstrateGroupedAnalytics() {
 	for dept, salaries := range deptData {
 		salaryStream := stream.FromSlice(salaries)
 		stats, err := stream.Aggregates(salaryStream,
-			stream.CountSpec[int64]("count"),
-			stream.SumSpec[int64]("total"),
-			stream.AvgSpec[int64]("average"),
-			stream.MinSpec[int64]("minimum"),
-			stream.MaxSpec[int64]("maximum"),
+			stream.CountStream[int64]("count"),
+			stream.SumStream[int64]("total"),
+			stream.AvgStream[int64]("average"),
+			stream.MinStream[int64]("minimum"),
+			stream.MaxStream[int64]("maximum"),
 		)
 		if err != nil {
 			continue
@@ -175,9 +175,9 @@ func demonstrateGroupedAnalytics() {
 
 	yearsStream := stream.FromSlice(allYears)
 	yearStats, _ := stream.Aggregates(yearsStream,
-		stream.AvgSpec[int64]("average"),
-		stream.MinSpec[int64]("minimum"), 
-		stream.MaxSpec[int64]("maximum"),
+		stream.AvgStream[int64]("average"),
+		stream.MinStream[int64]("minimum"), 
+		stream.MaxStream[int64]("maximum"),
 	)
 
 	fmt.Printf("  📅 Average Experience: %.1f years\n", yearStats["average"])

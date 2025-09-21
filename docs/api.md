@@ -389,18 +389,77 @@ Runs two aggregators on the same stream simultaneously.
 
 ### Aggregates
 ```go
-func Aggregates[T any](stream Stream[T], specs ...AggregateSpec[T]) (map[string]any, error)
+func Aggregates[T any](stream Stream[T], specs ...AggregatorSpec[T]) (Record, error)
 ```
-Runs multiple named aggregators and returns results in a map.
+Runs multiple named aggregators and returns results in a Record.
 
 **Example:**
 ```go
 results, err := Aggregates(stream,
-    SumSpec[int64]("total"),
-    CountSpec[int64]("count"),
-    AvgSpec[int64]("average"),
+    SumStream[int64]("total"),
+    CountStream[int64]("count"),
+    AvgStream[int64]("average"),
 )
 // results["total"], results["count"], results["average"]
+```
+
+### GroupBy
+```go
+func GroupBy(keyFields []string, aggregators ...AggregatorSpec[Record]) Filter[Record, Record]
+```
+Groups records by specified fields and applies aggregations to each group.
+
+**Example:**
+```go
+// Basic grouping (only key fields)
+grouped := GroupBy([]string{"department"})(users)
+
+// Grouping with aggregations (explicit count required)
+groupedWithStats := GroupBy([]string{"department"}, 
+    CountField("count", "name"),
+    SumField[int64]("total_salary", "salary"),
+    AvgField[int64]("avg_salary", "salary"),
+)(users)
+```
+
+### Aggregator Specifications
+
+#### For Stream Types
+```go
+func SumStream[T Numeric](name string) AggregatorSpec[T]
+func CountStream[T any](name string) AggregatorSpec[T]
+func AvgStream[T Numeric](name string) AggregatorSpec[T]
+func MinStream[T Comparable](name string) AggregatorSpec[T]
+func MaxStream[T Comparable](name string) AggregatorSpec[T]
+```
+
+#### For Record Fields
+```go
+func SumField[T Numeric](name, fieldName string) AggregatorSpec[Record]
+func CountField(name, fieldName string) AggregatorSpec[Record]
+func AvgField[T Numeric](name, fieldName string) AggregatorSpec[Record]
+func MinField[T Comparable](name, fieldName string) AggregatorSpec[Record]
+func MaxField[T Comparable](name, fieldName string) AggregatorSpec[Record]
+```
+
+### Low-Level Aggregators
+
+#### Generic Aggregators
+```go
+func SumAggregator[I any, T Numeric](extract func(I) T) Aggregator[I, T, T]
+func CountAggregator[I any]() Aggregator[I, int64, int64]
+func AvgAggregator[I any, T Numeric](extract func(I) T) Aggregator[I, [2]float64, float64]
+func MinAggregator[I any, T Comparable](extract func(I) T) Aggregator[I, *T, T]
+func MaxAggregator[I any, T Comparable](extract func(I) T) Aggregator[I, *T, T]
+```
+
+#### Field-Specific Aggregators
+```go
+func SumAggregatorField[T Numeric](fieldName string) Aggregator[Record, T, T]
+func CountAggregatorField(fieldName string) Aggregator[Record, int64, int64]
+func AvgAggregatorField[T Numeric](fieldName string) Aggregator[Record, [2]float64, float64]
+func MinAggregatorField[T Comparable](fieldName string) Aggregator[Record, *T, T]
+func MaxAggregatorField[T Comparable](fieldName string) Aggregator[Record, *T, T]
 ```
 
 ---

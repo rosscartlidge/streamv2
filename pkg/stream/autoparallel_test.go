@@ -122,10 +122,11 @@ func TestAutoParallelGroupBy(t *testing.T) {
 		start := time.Now()
 		results, err := Collect(
 			GroupBy([]string{"department"},
-				FieldSumSpec[int64]("total_salary", "salary"),
-				FieldAvgSpec[int64]("avg_salary", "salary"),
-				FieldMaxSpec[int64]("max_salary", "salary"),  // 3+ aggregators should trigger parallel
-				FieldMinSpec[int64]("min_salary", "salary"),
+				SumField[int64]("total_salary", "salary"),
+				AvgField[int64]("avg_salary", "salary"),
+				MaxField[int64]("max_salary", "salary"),  // 3+ aggregators should trigger parallel
+				MinField[int64]("min_salary", "salary"),
+				CountField("count", "department"),
 			)(FromSlice(data)))
 		duration := time.Since(start)
 		
@@ -141,7 +142,7 @@ func TestAutoParallelGroupBy(t *testing.T) {
 		// Verify aggregation results
 		for _, result := range results {
 			dept := GetOr(result, "department", "")
-			count := GetOr(result, "group_count", int64(0))
+			count := GetOr(result, "count", int64(0))
 			total := GetOr(result, "total_salary", int64(0))
 			
 			if dept == "" {

@@ -52,8 +52,9 @@ func main() {
 	start = time.Now()
 	groupedResults, _ := stream.Collect(
 		stream.GroupBy([]string{"dept"},
-			stream.FieldSumSpec[int]("total_salary", "salary"),
-			stream.FieldAvgSpec[int]("avg_salary", "salary"),
+			stream.SumField[int]("total_salary", "salary"),
+			stream.AvgField[int]("avg_salary", "salary"),
+			stream.CountField("count", "name"),
 		)(stream.FromSlice(users)))
 	recordTime := time.Since(start)
 	
@@ -62,7 +63,7 @@ func main() {
 		dept := stream.GetOr(result, "dept", "")
 		total := stream.GetOr(result, "total_salary", 0)
 		avg := stream.GetOr(result, "avg_salary", 0)
-		count := stream.GetOr(result, "group_count", int64(0))
+		count := stream.GetOr(result, "count", int64(0))
 		fmt.Printf("  %s: %d people, total=$%d, avg=$%d\n", dept, count, total, avg)
 	}
 	fmt.Printf("Time: %v\n", recordTime)

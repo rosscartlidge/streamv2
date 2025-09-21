@@ -154,14 +154,14 @@ stats, _ := stream.MultiAggregate(numbers) // Count, Sum, Min, Max, Avg
 
 // Generalized aggregators
 result, _ := stream.Aggregates(dataStream,
-    stream.SumSpec[int]("total"),
-    stream.CountSpec[int]("count"),
-    stream.MaxSpec[int]("maximum"),
+    stream.SumStream[int]("total"),
+    stream.CountStream[int]("count"),
+    stream.MaxStream[int]("maximum"),
 )
 
 // Complex record processing
 users := stream.GroupBy([]string{"department"}, 
-    stream.FieldAvgSpec[int64]("avg_salary", "salary"))(userStream)
+    stream.AvgField[int64]("avg_salary", "salary"))(userStream)
 
 // 🚀 NEW: Advanced windowing with session windows
 sessionWindows, _ := stream.Collect(

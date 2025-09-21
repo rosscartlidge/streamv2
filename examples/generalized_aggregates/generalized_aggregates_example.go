@@ -34,11 +34,11 @@ func demonstrateBasicAggregates() {
 	stream1 := stream.FromSlice(scores)
 	
 	results, err := stream.Aggregates(stream1,
-		stream.SumSpec[int64]("total_points"),
-		stream.CountSpec[int64]("student_count"),
-		stream.AvgSpec[int64]("class_average"),
-		stream.MinSpec[int64]("lowest_score"),
-		stream.MaxSpec[int64]("highest_score"),
+		stream.SumStream[int64]("total_points"),
+		stream.CountStream[int64]("student_count"),
+		stream.AvgStream[int64]("class_average"),
+		stream.MinStream[int64]("lowest_score"),
+		stream.MaxStream[int64]("highest_score"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -78,11 +78,11 @@ func demonstrateCustomAggregates() {
 	stream1 := stream.FromSlice(numbers)
 	
 	results, err := stream.Aggregates(stream1,
-		stream.SumSpec[int64]("sum"),                              // Standard
-		stream.CountSpec[int64]("count"),                          // Standard
+		stream.SumStream[int64]("sum"),                              // Standard
+		stream.CountStream[int64]("count"),                          // Standard
 		stream.CustomSpec("product", productAgg),                  // Custom
 		stream.CustomSpec("sum_of_squares", sumOfSquaresAgg),     // Custom
-		stream.AvgSpec[int64]("mean"),                            // Standard
+		stream.AvgStream[int64]("mean"),                            // Standard
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -139,11 +139,11 @@ func demonstrateRealWorldExample() {
 	salesStream := stream.FromSlice(sales)
 	
 	results, err := stream.Aggregates(salesStream,
-		stream.SumSpec[float64]("total_revenue"),
-		stream.CountSpec[float64]("sales_days"),
-		stream.AvgSpec[float64]("daily_average"),
-		stream.MinSpec[float64]("worst_day"),
-		stream.MaxSpec[float64]("best_day"),
+		stream.SumStream[float64]("total_revenue"),
+		stream.CountStream[float64]("sales_days"),
+		stream.AvgStream[float64]("daily_average"),
+		stream.MinStream[float64]("worst_day"),
+		stream.MaxStream[float64]("best_day"),
 		stream.CustomSpec("commission_earned", commissionAgg),
 		stream.CustomSpec("days_above_target", aboveTargetAgg),
 	)

@@ -587,37 +587,29 @@ func main() {
     fmt.Printf("- %s: $%.2f revenue (%d units)\n\n", 
                top["product"], top["revenue"], top["units_sold"])
 
-    // 3. Category analysis
-    categories, _ := stream.Collect(
-        stream.Map(func(p map[string]any) string {
-            return p["category"].(string)
-        })(stream.FromSlice(revenues)))
+    // 3. Category analysis with GroupBy
+    // Convert to Records for structured data processing
+    recordStream := stream.Map(func(p map[string]any) stream.Record {
+        return stream.Record(p)  // Convert map to Record
+    })(stream.FromSlice(revenues))
 
-    uniqueCategories := make(map[string]bool)
-    for _, cat := range categories {
-        uniqueCategories[cat] = true
-    }
+    // Group by category and calculate aggregations
+    categoryStats, _ := stream.Collect(
+        stream.GroupBy([]string{"category"}, 
+            stream.SumField[float64]("total_revenue", "revenue"),
+            stream.SumField[int64]("total_units", "units_sold"),
+            stream.CountField("product_count", "product"),
+        )(recordStream))
 
     fmt.Printf("Revenue by category:\n")
-    for category := range uniqueCategories {
-        categoryRevenue, _ := stream.Sum(
-            stream.Map(func(p map[string]any) float64 {
-                if p["category"].(string) == category {
-                    return p["revenue"].(float64)
-                }
-                return 0
-            })(stream.FromSlice(revenues)))
-
-        categoryUnits, _ := stream.Sum(
-            stream.Map(func(p map[string]any) int64 {
-                if p["category"].(string) == category {
-                    return p["units_sold"].(int64)
-                }
-                return 0
-            })(stream.FromSlice(revenues)))
-
-        fmt.Printf("- %s: $%.2f revenue, %d units sold\n", 
-                   category, categoryRevenue, categoryUnits)
+    for _, stat := range categoryStats {
+        category := stream.GetOr(stat, "category", "")
+        revenue := stream.GetOr(stat, "total_revenue", 0.0)
+        units := stream.GetOr(stat, "total_units", int64(0))
+        products := stream.GetOr(stat, "product_count", int64(0))
+        
+        fmt.Printf("- %s: $%.2f revenue, %d units sold (%d products)\n", 
+                   category, revenue, units, products)
     }
 
     // 4. Export results back to JSON
@@ -646,8 +638,8 @@ Best-selling product by revenue:
 - Device D: $10147.97 revenue (203 units)
 
 Revenue by category:
-- Tools: $8646.33 revenue, 341 units sold
-- Electronics: $12046.08 revenue, 292 units sold
+- Tools: $8646.33 revenue, 341 units sold (3 products)
+- Electronics: $12046.08 revenue, 292 units sold (2 products)
 
 === Exported JSON (first 200 chars) ===
 {"category":"Tools","product":"Widget A","revenue":2998.5,"units_sold":150}
@@ -658,7 +650,9 @@ Revenue by category:
 **Key Concepts:**
 - `JSONToStream()` and `StreamToJSON()` for JSON processing
 - JSON numbers become float64, integers become int64
-- Category grouping and aggregation patterns
+- `GroupBy()` with explicit aggregations (no automatic count)
+- Modern aggregation functions: `SumField`, `CountField`, etc.
+- Type-safe record access with `GetOr()`
 - Round-trip data processing (JSON → analysis → JSON)
 
 ---
@@ -843,7 +837,25 @@ func main() {
     }
     fmt.Printf("✅ Always check errors: %v\n", result)
 
-    // 2. Readable pipeline construction
+    // 2. Multiple aggregations in one pass
+    testNumbers := []int64{10, 20, 30, 40, 50}
+    
+    stats, err := stream.Aggregates(stream.FromSlice(testNumbers),
+        stream.SumStream[int64]("total"),
+        stream.CountStream[int64]("count"), 
+        stream.AvgStream[int64]("average"),
+        stream.MinStream[int64]("minimum"),
+        stream.MaxStream[int64]("maximum"),
+    )
+    
+    if err != nil {
+        fmt.Printf("Error calculating stats: %v\n", err)
+        return
+    }
+    
+    fmt.Printf("✅ Multiple aggregations: %+v\n", stats)
+
+    // 3. Readable pipeline construction
     data := []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
     
     // Bad: Hard to read nested calls

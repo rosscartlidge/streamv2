@@ -21,13 +21,14 @@ func main() {
 	})
 
 	fmt.Println("\n📊 Basic GroupBy (count only):")
-	basicGrouped := stream.GroupBy([]string{"department"})(users)
+	basicGrouped := stream.GroupBy([]string{"department"}, 
+		stream.CountField("count", "name"))(users)
 	basicResults, _ := stream.Collect(basicGrouped)
 	
 	for _, result := range basicResults {
 		fmt.Printf("  %s: %d people\n", 
 			result["department"], 
-			result["group_count"])
+			result["count"])
 	}
 
 	// Reset data for next test
@@ -41,17 +42,18 @@ func main() {
 
 	fmt.Println("\n💰 GroupBy with Salary Aggregations:")
 	groupedWithStats := stream.GroupBy([]string{"department"}, 
-		stream.FieldAvgSpec[int64]("avg_salary", "salary"),
-		stream.FieldMinSpec[int64]("min_salary", "salary"),
-		stream.FieldMaxSpec[int64]("max_salary", "salary"),
-		stream.FieldSumSpec[int64]("total_salary", "salary"),
+		stream.AvgField[int64]("avg_salary", "salary"),
+		stream.MinField[int64]("min_salary", "salary"),
+		stream.MaxField[int64]("max_salary", "salary"),
+		stream.SumField[int64]("total_salary", "salary"),
+		stream.CountField("count", "name"),
 	)(users)
 
 	statsResults, _ := stream.Collect(groupedWithStats)
 	
 	for _, result := range statsResults {
 		fmt.Printf("  %s Department:\n", result["department"])
-		fmt.Printf("    👥 People: %d\n", result["group_count"])
+		fmt.Printf("    👥 People: %d\n", result["count"])
 		fmt.Printf("    💰 Avg Salary: $%.0f\n", result["avg_salary"])
 		fmt.Printf("    📊 Range: $%d - $%d\n", result["min_salary"], result["max_salary"])
 		fmt.Printf("    💸 Total Payroll: $%d\n\n", result["total_salary"])
