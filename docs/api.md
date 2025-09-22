@@ -127,7 +127,7 @@ Creates a stream of `any` type from a channel.
 
 ## Generate
 ```go
-func Generate[T any](generator func() T) Stream[T]
+func Generate[V Value](generator func() (V, error)) Stream[V]
 ```
 Creates an infinite stream using a generator function.
 
@@ -142,19 +142,20 @@ stream := Generate(func() int64 {
 
 ## GenerateAny
 ```go
-func GenerateAny[T any](generator func() T) Stream[any]
+func GenerateAny[T any](generator func() (T, error)) Stream[T]
 ```
 Creates an infinite stream of `any` type using a generator function.
 
 ## Range
 ```go
-func Range(start, end int64) Stream[int64]
+func Range(start, end, step int64) Stream[int64]
 ```
 Creates a stream of integers from start (inclusive) to end (exclusive).
 
 **Example:**
 ```go
-stream := Range(1, 6) // Produces: 1, 2, 3, 4, 5
+stream := Range(1, 6, 1) // Produces: 1, 2, 3, 4, 5
+evens := Range(0, 10, 2) // Produces: 0, 2, 4, 6, 8
 ```
 
 ## Once
@@ -269,13 +270,19 @@ names := ExtractField[string]("name")
 
 ## Tee
 ```go
-func Tee[T any](sideEffect func(T)) Filter[T, T]
+func Tee[T any](stream Stream[T], n int) []Stream[T]
 ```
-Applies a side effect to each element without modifying the stream.
+Splits a single stream into multiple identical streams that can be consumed independently.
 
 **Example:**
 ```go
-logged := Tee(func(x int64) { fmt.Printf("Processing: %d\n", x) })
+numbers := stream.FromSlice([]int{1, 2, 3, 4, 5})
+streams := stream.Tee(numbers, 3) // Split into 3 identical streams
+
+// Process each stream independently
+sum1, _ := stream.Sum(streams[0])
+sum2, _ := stream.Sum(streams[1])
+avg, _ := stream.Avg(streams[2])
 ```
 
 ## FlatMap
@@ -286,15 +293,23 @@ Maps each element to a stream and flattens the result.
 
 ## DotFlatten
 ```go
-func DotFlatten[T any]() Filter[Record, Record]
+func DotFlatten(separator string, fields ...string) Filter[Record, Record]
 ```
-Flattens nested records using dot notation for field names.
+Flattens nested records using dot product flattening (single output per input record).
+Stream fields are expanded using dot product (linear, one-to-one mapping).
+When streams have different lengths, uses minimum length and discards excess elements.
+
+Examples:
+- Same length: `{"id": 1, "tags": Stream["a", "b"], "scores": Stream[10, 20]}` produces
+  `[{"id": 1, "tags": "a", "scores": 10}, {"id": 1, "tags": "b", "scores": 20}]`
+- Different lengths: `{"short": Stream["a", "b"], "long": Stream[1, 2, 3, 4]}` produces
+  `[{"short": "a", "long": 1}, {"short": "b", "long": 2}]` (elements 3, 4 discarded)
 
 ## CrossFlatten
 ```go
-func CrossFlatten[T any]() Filter[Record, Record]
+func CrossFlatten(separator string, fields ...string) Filter[Record, Record]
 ```
-Flattens nested records using cross product expansion.
+Expands stream fields using cross product (cartesian product), creating multiple output records from each input.
 
 ---
 
@@ -328,7 +343,7 @@ count, err := Count(FromSlice([]string{"a", "b", "c"}))
 
 ## Max
 ```go
-func Max[T Ordered](stream Stream[T]) (T, error)
+func Max[T Comparable](stream Stream[T]) (T, error)
 ```
 Finds the maximum element in the stream.
 
@@ -340,7 +355,7 @@ max, err := Max(FromSlice([]int64{3, 1, 4, 1, 5}))
 
 ## Min
 ```go
-func Min[T Ordered](stream Stream[T]) (T, error)
+func Min[T Comparable](stream Stream[T]) (T, error)
 ```
 Finds the minimum element in the stream.
 
@@ -376,7 +391,7 @@ items, err := Collect(FromSlice([]int64{1, 2, 3}))
 
 ## ForEach
 ```go
-func ForEach[T any](action func(T)) func(Stream[T]) error
+func ForEach[T any](fn func(T)) func(Stream[T]) error
 ```
 Applies an action to each element in the stream.
 
@@ -397,13 +412,13 @@ Creates a sum aggregator that extracts numeric values using a function.
 
 ### MinAggregator
 ```go
-func MinAggregator[T any, U Ordered](extractor func(T) U) Aggregator[T, U]
+func MinAggregator[T any, U Comparable](extractor func(T) U) Aggregator[T, *U, U]
 ```
 Creates a min aggregator that extracts comparable values.
 
 ### MaxAggregator
 ```go
-func MaxAggregator[T any, U Ordered](extractor func(T) U) Aggregator[T, U]
+func MaxAggregator[T any, U Comparable](extractor func(T) U) Aggregator[T, *U, U]
 ```
 Creates a max aggregator that extracts comparable values.
 
@@ -724,13 +739,13 @@ Produces running average of elements.
 
 ### StreamingMax
 ```go
-func StreamingMax[T Ordered]() Filter[T, T]
+func StreamingMax[T Comparable]() Filter[T, T]
 ```
 Produces running maximum of elements.
 
 ### StreamingMin
 ```go
-func StreamingMin[T Ordered]() Filter[T, T]
+func StreamingMin[T Comparable]() Filter[T, T]
 ```
 Produces running minimum of elements.
 
@@ -808,9 +823,9 @@ type Numeric interface {
 ```
 Constraint for numeric types that support arithmetic operations.
 
-## Ordered
+## Comparable
 ```go
-type Ordered interface {
+type Comparable interface {
     ~int | ~int8 | ~int16 | ~int32 | ~int64 |
     ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
     ~float32 | ~float64 | ~string

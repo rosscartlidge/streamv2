@@ -437,22 +437,49 @@ func FlatMap[T, U any](fn func(T) Stream[U]) Filter[T, U] {
 	}
 }
 
-// DotFlatten flattens nested records using dot notation for field names.
+// DotFlatten flattens nested records using dot product flattening (single output per input).
 // Nested records become prefixed fields: {"user": {"name": "Alice"}} → {"user.name": "Alice"}
-// Stream fields are not flattened (use CrossFlatten for those).
+// Stream fields are expanded using dot product (linear, one-to-one mapping).
+// When streams have different lengths, uses minimum length and discards excess elements.
+// Example with streams: {"id": 1, "tags": Stream["a", "b"], "scores": Stream[10, 20]} →
+//   [{"id": 1, "tags": "a", "scores": 10}, {"id": 1, "tags": "b", "scores": 20}]
+// Example with different lengths: {"short": Stream["a", "b"], "long": Stream[1, 2, 3, 4]} →
+//   [{"short": "a", "long": 1}, {"short": "b", "long": 2}] (elements 3, 4 discarded)
 func DotFlatten(separator string, fields ...string) Filter[Record, Record] {
 	if separator == "" {
 		separator = "."
 	}
-	
+
 	return func(input Stream[Record]) Stream[Record] {
+		var expandedRecords []Record
+		var currentIndex int
+
 		return func() (Record, error) {
+			// If we have expanded records to return, return them first
+			if currentIndex < len(expandedRecords) {
+				record := expandedRecords[currentIndex]
+				currentIndex++
+				return record, nil
+			}
+
+			// Get next input record
 			record, err := input()
 			if err != nil {
 				return nil, err
 			}
-			
-			return dotFlattenRecord(record, "", separator, fields...), nil
+
+			// Expand the record (handling both nested records and streams)
+			expandedRecords = dotFlattenRecordWithStreams(record, "", separator, fields...)
+			currentIndex = 0
+
+			// Return first expanded record
+			if len(expandedRecords) > 0 {
+				currentIndex = 1
+				return expandedRecords[0], nil
+			}
+
+			// Fallback (shouldn't happen)
+			return record, nil
 		}
 	}
 }
@@ -494,9 +521,95 @@ func dotFlattenRecord(record Record, prefix, separator string, fields ...string)
 	return result
 }
 
-// CrossFlatten creates cartesian product of stream fields within records.
-// Uses the original flatten algorithm that can handle infinite streams.
-// Example: {"id": 1, "tags": Stream["a", "b"]} → [{"id": 1, "tag": "a"}, {"id": 1, "tag": "b"}]
+// dotFlattenRecordWithStreams flattens a record using dot product expansion for streams
+// Returns multiple records when streams are present (dot product expansion)
+// Uses minimum length when streams have different lengths, discarding excess elements
+func dotFlattenRecordWithStreams(record Record, prefix, separator string, fields ...string) []Record {
+	// Create a set of fields to flatten for quick lookup
+	fieldsToFlatten := make(map[string]bool)
+	if len(fields) > 0 {
+		for _, field := range fields {
+			fieldsToFlatten[field] = true
+		}
+	}
+
+	// Collect all stream fields that should be expanded
+	var streamFields []string
+	var streamValues [][]interface{}
+	var nonStreamRecord Record = make(Record)
+
+	for key, value := range record {
+		newKey := key
+		if prefix != "" {
+			newKey = prefix + separator + key
+		}
+
+		// Check if this field should be flattened (only applies to top-level fields)
+		shouldFlatten := len(fields) == 0 || prefix != "" || fieldsToFlatten[key]
+
+		// If the value is a nested record, flatten it recursively
+		if nestedRecord, ok := value.(Record); ok && shouldFlatten {
+			flattened := dotFlattenRecord(nestedRecord, newKey, separator)
+			for flatKey, flatValue := range flattened {
+				nonStreamRecord[flatKey] = flatValue
+			}
+		} else if stream, ok := value.(Stream[interface{}]); ok && shouldFlatten {
+			// This is a stream field - collect its values for dot product expansion
+			var values []interface{}
+			for {
+				if val, err := stream(); err == nil {
+					values = append(values, val)
+				} else {
+					break
+				}
+			}
+			if len(values) > 0 {
+				streamFields = append(streamFields, newKey)
+				streamValues = append(streamValues, values)
+			}
+		} else {
+			// For non-record, non-stream values, or fields not to be flattened, keep as-is
+			nonStreamRecord[newKey] = value
+		}
+	}
+
+	// If no stream fields, return single record
+	if len(streamFields) == 0 {
+		return []Record{nonStreamRecord}
+	}
+
+	// Determine the length for dot product (use minimum length of all streams)
+	minLen := len(streamValues[0])
+	for _, values := range streamValues[1:] {
+		if len(values) < minLen {
+			minLen = len(values)
+		}
+	}
+
+	// Create dot product expansion - pair corresponding elements from each stream
+	var results []Record
+	for i := 0; i < minLen; i++ {
+		result := make(Record)
+
+		// Copy non-stream fields
+		for key, value := range nonStreamRecord {
+			result[key] = value
+		}
+
+		// Add corresponding element from each stream
+		for j, fieldName := range streamFields {
+			result[fieldName] = streamValues[j][i]
+		}
+
+		results = append(results, result)
+	}
+
+	return results
+}
+
+// CrossFlatten expands stream fields using cross product (cartesian product) expansion.
+// Creates multiple output records from each input record containing stream fields.
+// Example: {"id": 1, "tags": Stream["a", "b"]} → [{"id": 1, "tags": "a"}, {"id": 1, "tags": "b"}]
 func CrossFlatten(separator string, fields ...string) Filter[Record, Record] {
 	if separator == "" {
 		separator = "."
