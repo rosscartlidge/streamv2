@@ -646,7 +646,7 @@ You've learned StreamV2's most advanced features:
 - [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
 - [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing
 - [API Reference](api.md) - Complete function documentation
-- [Examples](../examples/) - Real-world usage patterns
+- [Examples](../stream_examples/) - Real-world usage patterns
 
 ---
 

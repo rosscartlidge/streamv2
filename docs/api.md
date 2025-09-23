@@ -1231,6 +1231,6 @@ if !ok {
 
 # Examples
 
-See the [StreamV2 Codelab](../STREAMV2_CODELAB.md) for comprehensive examples and tutorials.
+See the [StreamV2 Codelab](STREAMV2_CODELAB.md) for comprehensive examples and tutorials.
 
 Additional examples are available in the [examples directory](../stream_examples/).

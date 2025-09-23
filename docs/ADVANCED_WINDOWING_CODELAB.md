@@ -1088,8 +1088,8 @@ You've learned how to use StreamV2's advanced windowing capabilities:
 
 ### Next Steps
 
-- Explore the [complete examples](../examples/) directory
-- Check out [event-time windowing examples](../examples/event_time_windowing/)
+- Explore the [complete examples](../stream_examples/) directory
+- Check out [event-time windowing examples](../stream_examples/event_time_windowing/)
 - Read the [API documentation](api.md) for detailed function references
 - Implement custom triggers for your specific use cases
 
@@ -1097,7 +1097,7 @@ You've learned how to use StreamV2's advanced windowing capabilities:
 
 - [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
 - [API Reference](api.md) - Complete function documentation
-- [Examples](../examples/) - Real-world usage patterns
+- [Examples](../stream_examples/) - Real-world usage patterns
 
 ---
 
