@@ -636,6 +636,114 @@ stream.Chain(
 - ✅ Clean, readable pipeline
 - ✅ Powerful Record processing - filter, transform, enrich data
 
+### Chain() with Records - The Real Power!
+
+Here's where Chain() truly shines - processing structured data through multiple transformations:
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/rosscartlidge/streamv2/pkg/stream"
+)
+
+func main() {
+    fmt.Println("💪 Chain() with Records - The Real Power!")
+
+    // Sample employee data using fluent builder interface
+    employees := []stream.Record{
+        stream.NewRecord().String("name", "Alice").Int("salary", 50000).String("department", "Engineering").Build(),
+        stream.NewRecord().String("name", "Bob").Int("salary", 35000).String("department", "Marketing").Build(),
+        stream.NewRecord().String("name", "Charlie").Int("salary", 75000).String("department", "Engineering").Build(),
+        stream.NewRecord().String("name", "Diana").Int("salary", 42000).String("department", "Sales").Build(),
+        stream.NewRecord().String("name", "Eve").Int("salary", 65000).String("department", "Engineering").Build(),
+    }
+
+    fmt.Println("📊 Processing employee data through Chain()...")
+
+    // Build a powerful Record processing pipeline
+    result, err := stream.Collect(
+        stream.Chain(
+            // Step 1: Filter to Engineering department only
+            stream.Where(func(r stream.Record) bool {
+                dept, _ := r["department"].AsString()
+                return dept == "Engineering"
+            }),
+
+            // Step 2: Add a bonus field (10% of salary)
+            stream.Map(func(r stream.Record) stream.Record {
+                name, _ := r["name"].AsString()
+                salary, _ := r["salary"].AsInt()
+                dept, _ := r["department"].AsString()
+                bonus := salary / 10
+
+                fmt.Printf("   💰 Added bonus to %s: $%d\n", name, bonus)
+
+                // Create new record with bonus field using fluent builder
+                return stream.NewRecord().
+                    String("name", name).
+                    Int("salary", salary).
+                    String("department", dept).
+                    Int("bonus", bonus).
+                    Build()
+            }),
+
+            // Step 3: Filter to high earners (salary > $60k)
+            stream.Where(func(r stream.Record) bool {
+                salary, _ := r["salary"].AsInt()
+                return salary > 60000
+            }),
+
+            // Step 4: Add total compensation field
+            stream.Map(func(r stream.Record) stream.Record {
+                name, _ := r["name"].AsString()
+                salary, _ := r["salary"].AsInt()
+                dept, _ := r["department"].AsString()
+                bonus, _ := r["bonus"].AsInt()
+                total := salary + bonus
+
+                fmt.Printf("   📈 Total comp for %s: $%d\n", name, total)
+
+                // Create new record with total compensation using fluent builder
+                return stream.NewRecord().
+                    String("name", name).
+                    Int("salary", salary).
+                    String("department", dept).
+                    Int("bonus", bonus).
+                    Int("total_comp", total).
+                    Build()
+            }),
+        )(stream.FromSlice(employees)))
+
+    if err != nil {
+        fmt.Printf("❌ Error: %v\n", err)
+        return
+    }
+
+    fmt.Println("\n✅ High-earning Engineering employees with bonuses:")
+    for _, emp := range result {
+        name, _ := emp["name"].AsString()
+        salary, _ := emp["salary"].AsInt()
+        bonus, _ := emp["bonus"].AsInt()
+        total, _ := emp["total_comp"].AsInt()
+        fmt.Printf("   👨‍💻 %s: $%d salary + $%d bonus = $%d total\n", name, salary, bonus, total)
+    }
+}
+```
+
+**This Chain() pipeline:**
+1. **Filters** to Engineering department only
+2. **Enriches** each record with a calculated bonus field
+3. **Filters** to high earners only
+4. **Enriches** each record with total compensation
+
+**Why Chain() is perfect for this:**
+- ✅ **Same type throughout** - always working with `Record`
+- ✅ **Clean pipeline** - easy to read and understand
+- ✅ **Easy to modify** - add/remove/reorder steps
+- ✅ **Powerful transformations** - filter, enrich, calculate on structured data
+
 ### Method 2: Using `Pipe` (For type transformations)
 ```go
 stream.Pipe(
