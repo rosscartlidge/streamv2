@@ -15,6 +15,9 @@ Complete reference for all exported functions in the StreamV2 package.
 
 ## Quick Function Reference
 
+### Core Types & Constraints
+[Value](#value) • [Stream[T]](#streamt) • [Record](#record) • [Filter[T, U]](#filtert-u) • [Numeric](#numeric) • [Comparable](#comparable) • [EOS Error](#eos-error)
+
 ### Stream Constructors
 [FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
 
