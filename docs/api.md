@@ -13,6 +13,29 @@ Complete reference for all exported functions in the StreamV2 package.
 - [Advanced Windowing](#advanced-windowing)
 - [Executor Architecture](#executor-architecture)
 
+## Quick Function Reference
+
+### Stream Constructors
+[FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
+
+### Core Filters
+[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten)
+
+### Sorting Operations
+[Sort](#sort) • [SortAsc](#sortasc) • [SortDesc](#sortdesc) • [SortBy](#sortby) • [SortByDesc](#sortbydesc) • [SortCountWindow](#sortcountwindow) • [SortTimeWindow](#sorttimewindow) • [TopK](#topk) • [BottomK](#bottomk)
+
+### Aggregators
+[Sum](#sum) • [Count](#count) • [Max](#max) • [Min](#min) • [Avg](#avg) • [Collect](#collect) • [ForEach](#foreach)
+
+### I/O Operations
+**CSV**: [CSVToStream](#csv-operations) • [StreamToCSV](#csv-operations) • [CSVToStreamFromFile](#csv-operations) • [StreamToCSVFile](#csv-operations)
+**TSV**: [TSVToStream](#tsv-operations) • [StreamToTSV](#tsv-operations)
+**JSON**: [JSONToStream](#json-operations) • [StreamToJSON](#json-operations) • [JSONToStreamFromFile](#json-operations) • [StreamToJSONFile](#json-operations)
+**Protobuf**: [ProtobufToStream](#protocol-buffer-operations) • [StreamToProtobuf](#protocol-buffer-operations)
+
+### Advanced Windowing
+[CountWindow](#basic-windowing-functions) • [TimeWindow](#basic-windowing-functions) • [SlidingCountWindow](#basic-windowing-functions) • [SessionWindow](#session-windows) • [TriggeredWindow](#triggers) • [WindowBuilder](#window-builder)
+
 ---
 
 # Core Types
