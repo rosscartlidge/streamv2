@@ -20,10 +20,10 @@ Complete reference for all exported functions in the StreamV2 package.
 [Value](#value) • [Stream[T]](#streamt) • [Record](#record) • [Filter[T, U]](#filtert-u) • [Numeric](#numeric) • [Comparable](#comparable) • [EOS Error](#eos-error)
 
 ### Stream Constructors
-[FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
+[FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromMaps](#frommaps) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
 
 ### Core Filters
-[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten)
+[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Chain](#chain) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten) • [WithContext](#withcontext)
 
 ### Join Operations
 [InnerJoin](#innerjoin) • [LeftJoin](#leftjoin) • [RightJoin](#rightjoin) • [FullJoin](#fulljoin) • [WithPrefixes](#withprefixes)
@@ -206,6 +206,37 @@ func OnceAny[T any](value T) Stream[any]
 ```
 Creates a stream of `any` type containing a single element.
 
+## FromMaps
+```go
+func FromMaps(maps []map[string]any) (Stream[Record], error)
+```
+Creates a stream from a slice of string maps, converting each map to a Record with proper type validation.
+
+**Example:**
+```go
+maps := []map[string]any{
+    {"name": "Alice", "age": 30, "salary": 75000.0},
+    {"name": "Bob", "age": 25, "salary": 65000.0},
+}
+stream, err := stream.FromMaps(maps)
+// Creates Record stream with type-safe values
+```
+
+## WithContext
+```go
+func WithContext[T any](ctx context.Context, stream Stream[T]) Stream[T]
+```
+Adds context support to a stream for cancellation and timeout control.
+
+**Example:**
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+contextStream := stream.WithContext(ctx, dataStream)
+// Stream operations will respect context cancellation
+```
+
 ---
 
 # Core Filters
@@ -268,6 +299,21 @@ Combines multiple filters in sequence.
 pipeline := Pipe(
     Map(func(x int64) int64 { return x * x }),
     Where(func(x int64) bool { return x > 10 }),
+)
+```
+
+## Chain
+```go
+func Chain[T any](filters ...Filter[T, T]) Filter[T, T]
+```
+Combines multiple filters of the same type in sequence. More convenient than Pipe for same-type transformations.
+
+**Example:**
+```go
+pipeline := Chain(
+    Where(func(x int) bool { return x > 0 }),
+    Map(func(x int) int { return x * 2 }),
+    Where(func(x int) bool { return x < 100 }),
 )
 ```
 
