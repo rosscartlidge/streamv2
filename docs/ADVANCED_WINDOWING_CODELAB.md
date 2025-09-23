@@ -18,6 +18,14 @@ Welcome to the advanced windowing codelab! This tutorial covers StreamV2's power
 - Understanding of time concepts in streaming systems
 - Go 1.21+ installed
 
+## Chapter Navigation
+
+**Foundations:** [Understanding Time](#understanding-time-in-streaming) • [Chapter 1: Basic Windowing](#chapter-1-basic-windowing) • [Chapter 2: Sliding Windows](#chapter-2-sliding-windows)
+
+**Advanced:** [Chapter 3: Session Windows](#chapter-3-session-windows) • [Chapter 4: Advanced Triggers](#chapter-4-advanced-triggers) • [Chapter 5: Event-Time Processing](#chapter-5-event-time-processing)
+
+**Expert:** [Chapter 6: Complex Scenarios](#chapter-6-complex-real-world-scenarios) • [Chapter 7: WindowBuilder](#chapter-7-windowbuilder-fluent-api) • [Advanced Sorting](#advanced-sorting-for-infinite-streams)
+
 ---
 
 ## Understanding Time in Streaming

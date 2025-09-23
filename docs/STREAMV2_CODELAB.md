@@ -12,6 +12,14 @@ Welcome to the StreamV2 codelab! This hands-on tutorial will teach you modern st
 
 📚 **Advanced Topics**: For complex windowing, event-time processing, and real-time analytics, see the [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md)
 
+## Tutorial Navigation
+
+**Beginner:** [Step 1](#step-1-your-first-stream) • [Step 2](#step-2-transform-data-with-map) • [Step 3](#step-3-filter-data-with-where) • [Step 4](#step-4-combine-operations-with-pipe)
+
+**Intermediate:** [Step 5](#step-5-aggregate-data) • [Step 6](#step-6-working-with-real-data---csv-processing) • [Step 7](#step-7-data-analysis-pipeline) • [Step 8](#step-8-working-with-json-data)
+
+**Advanced:** [Step 9](#step-9-sorting-your-data) • [Step 10](#step-10-advanced-stream-operations) • [Step 11](#step-11-best-practices-and-performance-tips)
+
 ## Prerequisites
 
 - Basic Go knowledge
