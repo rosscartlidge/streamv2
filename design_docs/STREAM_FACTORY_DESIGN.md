@@ -119,7 +119,7 @@ randomFactory := func() Stream[float64] {
     rng := rand.New(rand.NewSource(12345))  // Fixed seed
     return stream.Generate(func() float64 { 
         return rng.Float64() 
-    }).Take(1000)
+    }).Limit(1000)
 }
 
 record := Record{"random_data": randomFactory}
@@ -273,7 +273,7 @@ func NewFileFactory(filename string) StreamFactory[Record] {
 // Create factory with deterministic generator
 func NewGeneratorFactory[T any](generator func() T, count int) StreamFactory[T] {
     return func() Stream[T] {
-        return Generate(generator).Take(count)
+        return Generate(generator).Limit(count)
     }
 }
 
@@ -283,7 +283,7 @@ func NewSeededRandomFactory(seed int64, count int) StreamFactory[float64] {
         rng := rand.New(rand.NewSource(seed))
         return Generate(func() float64 { 
             return rng.Float64() 
-        }).Take(count)
+        }).Limit(count)
     }
 }
 ```

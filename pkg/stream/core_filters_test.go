@@ -127,50 +127,50 @@ func TestWhere(t *testing.T) {
 	})
 }
 
-// TestTake tests the Take filter
-func TestTake(t *testing.T) {
-	t.Run("TakeFirst3", func(t *testing.T) {
+// TestLimit tests the Limit filter (equivalent to SQL LIMIT)
+func TestLimit(t *testing.T) {
+	t.Run("LimitFirst3", func(t *testing.T) {
 		input := []int64{1, 2, 3, 4, 5}
 		stream := FromSlice(input)
-		
-		first3 := Take[int64](3)(stream)
+
+		first3 := Limit[int64](3)(stream)
 		results, err := Collect(first3)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
 		}
-		
+
 		expected := []int64{1, 2, 3}
 		if len(results) != len(expected) {
 			t.Fatalf("Expected %d results, got %d", len(expected), len(results))
 		}
-		
+
 		for i, result := range results {
 			if result != expected[i] {
 				t.Errorf("Expected %v at position %d, got %v", expected[i], i, result)
 			}
 		}
 	})
-	
-	t.Run("TakeZero", func(t *testing.T) {
+
+	t.Run("LimitZero", func(t *testing.T) {
 		input := []int64{1, 2, 3}
 		stream := FromSlice(input)
-		
-		none := Take[int64](0)(stream)
+
+		none := Limit[int64](0)(stream)
 		results, err := Collect(none)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
 		}
-		
+
 		if len(results) != 0 {
 			t.Fatalf("Expected 0 results, got %d", len(results))
 		}
 	})
-	
-	t.Run("TakeMoreThanAvailable", func(t *testing.T) {
+
+	t.Run("LimitMoreThanAvailable", func(t *testing.T) {
 		input := []int64{1, 2}
 		stream := FromSlice(input)
-		
-		first10 := Take[int64](10)(stream)
+
+		first10 := Limit[int64](10)(stream)
 		results, err := Collect(first10)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
@@ -188,59 +188,59 @@ func TestTake(t *testing.T) {
 	})
 }
 
-// TestSkip tests the Skip filter
-func TestSkip(t *testing.T) {
-	t.Run("SkipFirst2", func(t *testing.T) {
+// TestOffset tests the Offset filter (equivalent to SQL OFFSET)
+func TestOffset(t *testing.T) {
+	t.Run("OffsetFirst2", func(t *testing.T) {
 		input := []int64{1, 2, 3, 4, 5}
 		stream := FromSlice(input)
-		
-		skip2 := Skip[int64](2)(stream)
-		results, err := Collect(skip2)
+
+		offset2 := Offset[int64](2)(stream)
+		results, err := Collect(offset2)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
 		}
-		
+
 		expected := []int64{3, 4, 5}
 		if len(results) != len(expected) {
 			t.Fatalf("Expected %d results, got %d", len(expected), len(results))
 		}
-		
+
 		for i, result := range results {
 			if result != expected[i] {
 				t.Errorf("Expected %v at position %d, got %v", expected[i], i, result)
 			}
 		}
 	})
-	
-	t.Run("SkipAll", func(t *testing.T) {
+
+	t.Run("OffsetAll", func(t *testing.T) {
 		input := []int64{1, 2, 3}
 		stream := FromSlice(input)
-		
-		skipAll := Skip[int64](5)(stream)
-		results, err := Collect(skipAll)
+
+		offsetAll := Offset[int64](5)(stream)
+		results, err := Collect(offsetAll)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
 		}
-		
+
 		if len(results) != 0 {
 			t.Fatalf("Expected 0 results, got %d", len(results))
 		}
 	})
-	
-	t.Run("SkipZero", func(t *testing.T) {
+
+	t.Run("OffsetZero", func(t *testing.T) {
 		input := []int64{1, 2, 3}
 		stream := FromSlice(input)
-		
-		skipNone := Skip[int64](0)(stream)
-		results, err := Collect(skipNone)
+
+		offsetNone := Offset[int64](0)(stream)
+		results, err := Collect(offsetNone)
 		if err != nil {
 			t.Fatalf("Failed to collect stream: %v", err)
 		}
-		
+
 		if len(results) != len(input) {
 			t.Fatalf("Expected %d results, got %d", len(input), len(results))
 		}
-		
+
 		for i, result := range results {
 			if result != input[i] {
 				t.Errorf("Expected %v at position %d, got %v", input[i], i, result)
@@ -285,7 +285,7 @@ func TestPipe(t *testing.T) {
 		// Filter evens then take first 2
 		pipeline := Pipe(
 			Where(func(x int64) bool { return x%2 == 0 }),
-			Take[int64](2),
+			Limit[int64](2),
 		)(stream)
 		
 		results, err := Collect(pipeline)
@@ -316,7 +316,7 @@ func TestPipe3(t *testing.T) {
 		pipeline := Pipe3(
 			Map(func(x int64) int64 { return x * 3 }),
 			Where(func(x int64) bool { return x > 5 }),
-			Take[int64](2),
+			Limit[int64](2),
 		)(stream)
 		
 		results, err := Collect(pipeline)
@@ -346,7 +346,7 @@ func TestChain(t *testing.T) {
 		chained := Chain(
 			Where(func(x int64) bool { return x%2 == 0 }), // evens
 			Where(func(x int64) bool { return x > 4 }),    // > 4
-			Take[int64](2),                               // first 2
+			Limit[int64](2),                               // first 2
 		)(stream)
 		
 		results, err := Collect(chained)

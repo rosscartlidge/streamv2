@@ -1765,22 +1765,22 @@ func main() {
     fmt.Printf("=== Advanced Stream Operations ===\n")
     fmt.Printf("Total transactions: %d\n\n", len(transactions))
 
-    // 1. Take and Skip operations
+    // 1. Limit and Offset operations (SQL-style pagination)
     firstThree, _ := stream.Collect(
-        stream.Take[map[string]any](3)(
+        stream.Limit[map[string]any](3)(
             stream.FromSlice(transactions)))
 
-    fmt.Printf("First 3 transactions:\n")
+    fmt.Printf("First 3 transactions (LIMIT 3):\n")
     for _, tx := range firstThree {
         fmt.Printf("- ID %v: $%.2f %s\n", tx["id"], tx["amount"], tx["type"])
     }
     fmt.Println()
 
-    skipTwo, _ := stream.Collect(
-        stream.Skip[map[string]any](2)(
+    offsetTwo, _ := stream.Collect(
+        stream.Offset[map[string]any](2)(
             stream.FromSlice(transactions)))
 
-    fmt.Printf("After skipping first 2 transactions: %d remaining\n\n", len(skipTwo))
+    fmt.Printf("After offset 2 transactions: %d remaining (OFFSET 2)\n\n", len(offsetTwo))
 
     // 2. Multiple aggregations at once
     creditAmounts, _ := stream.Collect(
@@ -1883,7 +1883,7 @@ User Account Balances:
 ```
 
 **Key Concepts:**
-- `Take()` and `Skip()` for pagination and limiting results
+- `Limit()` and `Offset()` for SQL-style pagination and result limiting
 - Multiple aggregations using separate pipelines
 - Complex multi-step filtering and transformation
 - Business logic implementation using stream operations

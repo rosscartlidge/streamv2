@@ -359,7 +359,7 @@ func demonstratePerformanceCharacteristics() {
 	fmt.Println("result := stream.Chain(")
 	fmt.Println("    stream.Where(func(x int64) bool { return x%2 == 0 }),")
 	fmt.Println("    stream.Map(func(x int64) int64 { return x * x }),")
-	fmt.Println("    stream.Take[int64](1000),")
+	fmt.Println("    stream.Limit[int64](1000),")
 	fmt.Println(")(stream.FromSlice(largeDataset))")
 	fmt.Println("```")
 
@@ -368,7 +368,7 @@ func demonstratePerformanceCharacteristics() {
 	processedStream := stream.Chain(
 		stream.Where(func(x int64) bool { return x%2 == 0 }),
 		stream.Map(func(x int64) int64 { return x*x }),
-		stream.Take[int64](5), // Only need first 5
+		stream.Limit[int64](5), // Only need first 5
 	)(dataStream)
 
 	results, _ := stream.Collect(processedStream)

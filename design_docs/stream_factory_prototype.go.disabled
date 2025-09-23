@@ -35,7 +35,7 @@ func NewSliceFactory[T any](data []T) StreamFactory[T] {
 // NewGeneratorFactory creates a factory with deterministic generator
 func NewGeneratorFactory[T any](generator func() T, count int) StreamFactory[T] {
 	return func() stream.Stream[T] {
-		return stream.Generate(generator).Take(count)
+		return stream.Generate(generator).Limit(count)
 	}
 }
 
@@ -45,7 +45,7 @@ func NewSeededRandomFactory(seed int64, count int) StreamFactory[float64] {
 		rng := rand.New(rand.NewSource(seed))
 		return stream.Generate(func() float64 {
 			return rng.Float64()
-		}).Take(count)
+		}).Limit(count)
 	}
 }
 
@@ -379,7 +379,7 @@ func dualFormatExample() {
 		return math.Sin(x) 
 	})(cpuStream)
 	
-	cpuResult, _ := stream.Take[float64](10)(cpuProcessed)
+	cpuResult, _ := stream.Limit[float64](10)(cpuProcessed)
 	cpuValues, _ := stream.Collect(cpuResult)
 	fmt.Printf("CPU processing (first 10): %v\n", cpuValues[:5]) // Show first 5
 	

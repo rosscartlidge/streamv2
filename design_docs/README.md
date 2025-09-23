@@ -65,7 +65,7 @@ func main() {
 
 ### ✅ **Rich Operation Set**
 - **Transformations**: Map, FlatMap, Select
-- **Filters**: Where, Take, Skip  
+- **Filters**: Where, Limit, Offset  
 - **Aggregations**: Sum, Count, Max, Min, Avg
 - **I/O**: CSV, JSON, TSV, Protocol Buffers
 - **Windowing**: Time-based and count-based windows
@@ -117,7 +117,7 @@ result, err := stream.Collect(
     stream.Pipe(
         stream.Map(transform),        // Transform each element
         stream.Where(filter),         // Filter elements  
-        stream.Take[T](limit),       // Limit results
+        stream.Limit[T](limit),      // Limit results (SQL LIMIT)
     )(sourceStream))
 ```
 

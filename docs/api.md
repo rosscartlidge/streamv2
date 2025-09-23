@@ -2,6 +2,54 @@
 
 Complete reference for all exported functions in the StreamV2 package.
 
+## SQL-Inspired Design Philosophy
+
+StreamV2 follows SQL naming conventions to provide familiar, intuitive APIs for data professionals:
+
+| **SQL Concept** | **StreamV2 Function** | **Example** |
+|----------------|----------------------|-------------|
+| `SELECT` | `Map`, `Select` | Transform and project data |
+| `WHERE` | `Where` | Filter records with predicates |
+| `LIMIT` | `Limit` | Restrict result count |
+| `OFFSET` | `Offset` | Skip initial records |
+| `GROUP BY` | `GroupBy` | Group records by key |
+| `JOIN` | `InnerJoin`, `LeftJoin`, etc. | Combine data streams |
+| `ORDER BY` | `Sort`, `SortBy` | Sort data |
+| `COUNT`, `SUM`, `AVG` | `Count`, `Sum`, `Avg` | Aggregate functions |
+
+**Example - SQL to StreamV2 translation:**
+```sql
+-- SQL Query
+SELECT customer, amount * 1.1 as adjusted_amount
+FROM orders
+WHERE status = 'completed'
+ORDER BY amount DESC
+LIMIT 10 OFFSET 5;
+```
+
+```go
+// StreamV2 Equivalent
+result := stream.Collect(
+    stream.Limit[stream.Record](10)(
+        stream.Offset[stream.Record](5)(
+            stream.SortByDesc(func(r stream.Record) float64 {
+                amount, _ := r["amount"].AsFloat()
+                return amount
+            })(
+                stream.Map(func(r stream.Record) stream.Record {
+                    amount, _ := r["amount"].AsFloat()
+                    return stream.NewRecord().
+                        String("customer", stream.GetOr(r, "customer", "")).
+                        Float("adjusted_amount", amount * 1.1).
+                        Build()
+                })(
+                    stream.Where(func(r stream.Record) bool {
+                        return stream.GetOr(r, "status", "") == "completed"
+                    })(orderStream)))))))
+```
+
+This familiar naming reduces the learning curve for developers with SQL experience.
+
 ## Table of Contents
 
 - [Core Types](#core-types)
@@ -25,7 +73,7 @@ Complete reference for all exported functions in the StreamV2 package.
 [FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromMaps](#frommaps) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
 
 ### Core Filters
-[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Chain](#chain) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [Split](#split) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten) • [WithContext](#withcontext)
+[Map](#map) • [Where](#where) • [Limit](#limit) • [Offset](#offset) • [Pipe](#pipe) • [Chain](#chain) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [Split](#split) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten) • [WithContext](#withcontext)
 
 ### Join Operations
 [InnerJoin](#innerjoin) • [LeftJoin](#leftjoin) • [RightJoin](#rightjoin) • [FullJoin](#fulljoin) • [WithPrefixes](#withprefixes)
@@ -328,26 +376,36 @@ Filters stream elements, keeping only those where the predicate returns true.
 evens := Where(func(x int64) bool { return x%2 == 0 })
 ```
 
-## Take
+## Limit
 ```go
-func Take[T any](n int) Filter[T, T]
+func Limit[T any](n int) Filter[T, T]
 ```
-Takes the first n elements from the stream.
+Restricts stream to first N elements (equivalent to SQL `LIMIT`).
 
 **Example:**
 ```go
-firstThree := Take[int64](3)
+// Get first 10 records (SQL: SELECT * FROM table LIMIT 10)
+firstTen := stream.Limit[stream.Record](10)
+
+// Combined with Offset for pagination
+page2 := stream.Limit[stream.Record](10)(
+    stream.Offset[stream.Record](10)(userStream))
 ```
 
-## Skip
+## Offset
 ```go
-func Skip[T any](n int) Filter[T, T]
+func Offset[T any](n int) Filter[T, T]
 ```
-Skips the first n elements in the stream.
+Skips first N elements (equivalent to SQL `OFFSET`).
 
 **Example:**
 ```go
-skipTwo := Skip[int64](2)
+// Skip first 20 records (SQL: SELECT * FROM table OFFSET 20)
+skipTwenty := stream.Offset[stream.Record](20)
+
+// SQL-style pagination: LIMIT 10 OFFSET 20
+page3 := stream.Limit[stream.Record](10)(
+    stream.Offset[stream.Record](20)(userStream))
 ```
 
 ## Pipe

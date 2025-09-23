@@ -371,7 +371,7 @@ func main() {
 
     start := time.Now()
     results, err := stream.Collect(
-        stream.Take(10)(contextStream)) // Try to take 10 items
+        stream.Limit(10)(contextStream)) // Try to limit to 10 items
 
     elapsed := time.Since(start)
 
@@ -397,7 +397,7 @@ func main() {
 
     start = time.Now()
     results2, err2 := stream.Collect(
-        stream.Take(20)(contextStream2))
+        stream.Limit(20)(contextStream2))
 
     elapsed2 := time.Since(start)
 
@@ -434,7 +434,7 @@ func main() {
     )
 
     pipelineResults, pipelineErr := stream.Collect(
-        stream.Take(15)(pipeline))
+        stream.Limit(15)(pipeline))
 
     if pipelineErr != nil {
         fmt.Printf("Pipeline stopped due to context: %d records processed\n", len(pipelineResults))
@@ -500,7 +500,7 @@ func main() {
     // Step 2: Split by tenant for isolated processing
     fmt.Printf("=== Step 1: Splitting by Tenant ===\n")
     tenantStreams := stream.Split([]string{"tenant"})(
-        stream.Take(50)(logStream)) // Process first 50 logs
+        stream.Limit(50)(logStream)) // Process first 50 logs
 
     tenantProcessors := make(map[string][]stream.Record)
 

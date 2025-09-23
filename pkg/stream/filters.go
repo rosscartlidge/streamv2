@@ -141,8 +141,8 @@ func autoParallelFilter[T any](predicate func(T) bool, input Stream[T], complexi
 	}
 }
 
-// Take limits stream to first N elements
-func Take[T any](n int) Filter[T, T] {
+// Limit restricts stream to first N elements (equivalent to SQL LIMIT)
+func Limit[T any](n int) Filter[T, T] {
 	return func(input Stream[T]) Stream[T] {
 		count := 0
 		return func() (T, error) {
@@ -156,8 +156,8 @@ func Take[T any](n int) Filter[T, T] {
 	}
 }
 
-// Skip skips first N elements
-func Skip[T any](n int) Filter[T, T] {
+// Offset skips first N elements (equivalent to SQL OFFSET)
+func Offset[T any](n int) Filter[T, T] {
 	return func(input Stream[T]) Stream[T] {
 		skipped := 0
 		return func() (T, error) {

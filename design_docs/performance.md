@@ -21,7 +21,7 @@ This guide covers performance considerations and optimization strategies for Str
 - **FromSlice**: O(1) setup, lazy evaluation
 - **Map**: O(n) with function call overhead
 - **Where**: O(n) with predicate evaluation
-- **Take/Skip**: O(1) setup, early termination
+- **Limit/Offset**: O(1) setup, early termination
 
 ### Medium Overhead Operations
 - **Aggregations** (Sum, Count, Max, Min): O(n) single pass
