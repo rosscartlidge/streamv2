@@ -23,7 +23,7 @@ Complete reference for all exported functions in the StreamV2 package.
 [FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromMaps](#frommaps) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
 
 ### Core Filters
-[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Chain](#chain) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten) • [WithContext](#withcontext)
+[Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Chain](#chain) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [Split](#split) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten) • [WithContext](#withcontext)
 
 ### Join Operations
 [InnerJoin](#innerjoin) • [LeftJoin](#leftjoin) • [RightJoin](#rightjoin) • [FullJoin](#fulljoin) • [WithPrefixes](#withprefixes)
@@ -361,6 +361,43 @@ sum1, _ := stream.Sum(streams[0])
 sum2, _ := stream.Sum(streams[1])
 avg, _ := stream.Avg(streams[2])
 ```
+
+## Split
+```go
+func Split(keyFields []string) Filter[Record, Stream[Record]]
+```
+Dynamically splits a Record stream into multiple substreams based on key field values. Each substream contains all records sharing the same key combination. Works with both finite and infinite streams.
+
+**Example:**
+```go
+employees := []stream.Record{
+    stream.NewRecord().String("department", "Engineering").String("name", "Alice").Build(),
+    stream.NewRecord().String("department", "Sales").String("name", "Bob").Build(),
+    stream.NewRecord().String("department", "Engineering").String("name", "Charlie").Build(),
+    stream.NewRecord().String("department", "Marketing").String("name", "David").Build(),
+}
+
+// Split by department - creates separate substreams for each department
+departmentStreams := stream.Split([]string{"department"})(stream.FromSlice(employees))
+
+// Process each department separately
+for {
+    deptStream, err := departmentStreams()
+    if err != nil {
+        break // No more departments
+    }
+
+    // Each deptStream contains all employees from one department
+    deptEmployees, _ := stream.Collect(deptStream)
+    fmt.Printf("Department has %d employees\n", len(deptEmployees))
+}
+```
+
+**Use Cases:**
+- Dynamic partitioning of data streams
+- Real-time data routing by category
+- Parallel processing of grouped data
+- Event stream demultiplexing
 
 ## FlatMap
 ```go
