@@ -8,7 +8,7 @@
 ## 🚀 **Key Features**
 
 - **🔥 Type-Safe** - Full generics support with compile-time safety
-- **⚡ High Performance** - Auto-parallel processing and GPU acceleration
+- **⚡ High Performance** - Conservative auto-parallel processing (GPU acceleration planned)
 - **📊 Rich I/O** - CSV, JSON, TSV, Protocol Buffers with streaming support
 - **🎯 Simple API** - Clean, composable functions that just work
 
@@ -129,9 +129,12 @@ fmt.Printf("Stats: %+v\n", stats)
 
 ### **Parallel Processing**
 ```go
-// Automatic parallelization for expensive operations
-results := stream.Map(expensiveFunction)(largeDataset) // Auto-parallel
+// Conservative automatic parallelization for complex operations
+results := stream.Map(expensiveFunction)(largeDataset) // May auto-parallel
 simple := stream.Map(func(x int) int { return x * 2 })(smallDataset) // Sequential
+
+// Explicit parallel processing for full control
+processed := stream.Parallel(4, complexFunction)(datastream) // 4 workers
 ```
 
 ## 💡 **Real-World Examples**
