@@ -262,8 +262,8 @@ func TestTimeWindow(t *testing.T) {
 			return 1, nil
 		})
 		
-		// Take only a few items to avoid infinite stream
-		limitedStream := Take[int64](5)(stream)
+		// Limit to only a few items to avoid infinite stream
+		limitedStream := Limit[int64](5)(stream)
 		
 		windowed := TimeWindow[int64](50 * time.Millisecond)(limitedStream)
 		
