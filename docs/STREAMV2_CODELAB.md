@@ -612,10 +612,11 @@ func main() {
 ```
 
 **Why Chain is Great:**
-- ✅ **No type complexity** - all operations work on `int`
+- ✅ **Same type simplicity** - all operations work on the same type (in this case, `int`)
 - ✅ **Super readable** - just list operations in order
 - ✅ **Easy to modify** - add/remove steps easily
-- ✅ **Perfect for data cleaning** pipelines
+- ✅ **Incredibly powerful with Records** - chain multiple data transformations, filters, and enrichments on structured data
+- ✅ **Perfect for data processing** pipelines
 
 ## Three Ways to Build Pipelines
 
@@ -630,9 +631,10 @@ stream.Chain(
 ```
 
 **Perfect for**:
-- ✅ Multiple filters on the same data type
+- ✅ Multiple operations on the same data type (int, Record, etc.)
 - ✅ Super simple - no type juggling
 - ✅ Clean, readable pipeline
+- ✅ Powerful Record processing - filter, transform, enrich data
 
 ### Method 2: Using `Pipe` (For type transformations)
 ```go
