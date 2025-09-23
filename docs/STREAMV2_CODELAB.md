@@ -1932,9 +1932,9 @@ Congratulations! You've learned the fundamentals of stream processing with Strea
 
 ## Resources
 
-- [API Documentation](./docs/api.md)
-- [Performance Guide](./docs/performance.md)
-- [Examples Repository](./examples/)
-- [Contributing Guide](./CONTRIBUTING.md)
+- [API Documentation](api.md)
+- [Performance Guide](../design_docs/performance.md)
+- [Examples Repository](../examples/)
+- [Contributing Guide](../CONTRIBUTING.md)
 
 Start building amazing data processing applications with StreamV2! 🎉

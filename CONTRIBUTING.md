@@ -31,7 +31,7 @@ This is expected to happen in **Q2 2024** (tentative).
 While we're not accepting code contributions yet, you can still help by:
 
 ### 🧪 **Testing and Feedback**
-- Try the [codelab tutorial](STREAMV2_CODELAB.md) 
+- Try the [codelab tutorial](docs/STREAMV2_CODELAB.md) 
 - Test StreamV2 with your data processing use cases
 - Report bugs and API pain points via [GitHub Issues](https://github.com/rosscartlidge/streamv2/issues)
 - Share performance feedback on real workloads
@@ -122,8 +122,8 @@ When contributions do open, they should align with StreamV2's core principles:
 ## Questions?
 
 If you have questions about:
-- **Using StreamV2**: Check the [codelab](STREAMV2_CODELAB.md) and [API docs](docs/api.md)
-- **Performance**: See the [performance guide](docs/performance.md)
+- **Using StreamV2**: Check the [codelab](docs/STREAMV2_CODELAB.md) and [API docs](docs/api.md)
+- **Performance**: See the [performance guide](design_docs/performance.md)
 - **Future contributions**: Open a [GitHub Discussion](https://github.com/rosscartlidge/streamv2/discussions)
 - **Bug reports**: Use [GitHub Issues](https://github.com/rosscartlidge/streamv2/issues)
 

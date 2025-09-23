@@ -179,7 +179,7 @@ Everything else builds on these simple foundations.
 
 ## 📚 **Learn More**
 
-- **[Getting Started Guide](STREAMV2_CODELAB.md)** - Step-by-step tutorial
+- **[Getting Started Guide](docs/STREAMV2_CODELAB.md)** - Step-by-step tutorial
 - **[API Reference](docs/api.md)** - Complete function documentation  
 - **[Examples](examples/)** - Real-world usage patterns
 
