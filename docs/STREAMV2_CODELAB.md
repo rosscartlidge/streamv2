@@ -18,7 +18,7 @@ Welcome to the StreamV2 codelab! This hands-on tutorial will teach you modern st
 
 **Intermediate:** [Step 5](#step-5-aggregate-data) • [Step 6](#step-6-working-with-real-data---csv-processing) • [Step 7](#step-7-data-analysis-pipeline) • [Step 8](#step-8-working-with-json-data)
 
-**Advanced:** [Step 9](#step-9-sorting-your-data) • [Step 10](#step-10-advanced-stream-operations) • [Step 11](#step-11-best-practices-and-performance-tips)
+**Advanced:** [Step 9](#step-9-join-operations---combining-data-streams) • [Step 10](#step-10-sorting-your-data) • [Step 11](#step-11-advanced-stream-operations) • [Step 12](#step-12-best-practices-and-performance-tips)
 
 ## Prerequisites
 
@@ -1389,7 +1389,124 @@ Revenue by category:
 
 ---
 
-# Step 9: Sorting Your Data
+# Step 9: Join Operations - Combining Data Streams
+
+Real-world data often comes from multiple sources. StreamV2 provides SQL-style join operations to combine data streams efficiently.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/rosscartlidge/streamv2/pkg/stream"
+)
+
+func main() {
+    fmt.Printf("=== Join Operations ===\n\n")
+
+    // Create user data
+    users := []stream.Record{
+        stream.NewRecord().Int("id", 1).String("name", "Alice").String("email", "alice@example.com").Build(),
+        stream.NewRecord().Int("id", 2).String("name", "Bob").String("email", "bob@example.com").Build(),
+        stream.NewRecord().Int("id", 3).String("name", "Charlie").String("email", "charlie@example.com").Build(),
+    }
+
+    // Create profile data (notice: not all users have profiles)
+    profiles := []stream.Record{
+        stream.NewRecord().Int("userId", 1).String("department", "Engineering").Int("salary", 75000).Build(),
+        stream.NewRecord().Int("userId", 2).String("department", "Sales").Int("salary", 65000).Build(),
+        // Charlie (id=3) has no profile
+    }
+
+    userStream := stream.FromSlice(users)
+    profileStream := stream.FromSlice(profiles)
+
+    fmt.Printf("Users: %d records\n", len(users))
+    fmt.Printf("Profiles: %d records\n\n", len(profiles))
+
+    // 1. Inner Join - Only users who have profiles
+    fmt.Printf("=== Inner Join (users with profiles) ===\n")
+    innerJoined, _ := stream.Collect(
+        stream.InnerJoin(profileStream, "id", "userId")(userStream))
+
+    for _, record := range innerJoined {
+        name := stream.GetOr(record, "name", "")
+        dept := stream.GetOr(record, "department", "")
+        salary := stream.GetOr(record, "salary", int64(0))
+        fmt.Printf("- %s: %s, $%d\n", name, dept, salary)
+    }
+    fmt.Printf("Results: %d records\n\n", len(innerJoined))
+
+    // 2. Left Join - All users, with profile data when available
+    fmt.Printf("=== Left Join (all users, profiles when available) ===\n")
+
+    // Need fresh streams for the next join
+    userStream2 := stream.FromSlice(users)
+    profileStream2 := stream.FromSlice(profiles)
+
+    leftJoined, _ := stream.Collect(
+        stream.LeftJoin(profileStream2, "id", "userId")(userStream2))
+
+    for _, record := range leftJoined {
+        name := stream.GetOr(record, "name", "")
+        dept := stream.GetOr(record, "department", "Unknown")
+        salary := stream.GetOr(record, "salary", int64(0))
+
+        if salary > 0 {
+            fmt.Printf("- %s: %s, $%d\n", name, dept, salary)
+        } else {
+            fmt.Printf("- %s: %s (no profile)\n", name, dept)
+        }
+    }
+    fmt.Printf("Results: %d records\n\n", len(leftJoined))
+
+    // 3. Join with custom prefixes to handle field conflicts
+    fmt.Printf("=== Custom Prefixes (avoiding field conflicts) ===\n")
+
+    // Create data with conflicting field names
+    employees := []stream.Record{
+        stream.NewRecord().Int("id", 1).String("name", "Alice").Build(),
+        stream.NewRecord().Int("id", 2).String("name", "Bob").Build(),
+    }
+
+    managers := []stream.Record{
+        stream.NewRecord().Int("id", 1).String("name", "Alice Manager").String("title", "VP Engineering").Build(),
+        stream.NewRecord().Int("id", 2).String("name", "Bob Manager").String("title", "Sales Director").Build(),
+    }
+
+    empStream := stream.FromSlice(employees)
+    mgrStream := stream.FromSlice(managers)
+
+    customJoined, _ := stream.Collect(
+        stream.InnerJoin(mgrStream, "id", "id",
+            stream.WithPrefixes("emp.", "mgr."))(empStream))
+
+    for _, record := range customJoined {
+        empName := stream.GetOr(record, "emp.name", "")
+        mgrName := stream.GetOr(record, "mgr.name", "")
+        title := stream.GetOr(record, "title", "")
+        fmt.Printf("- Employee: %s, Manager: %s (%s)\n", empName, mgrName, title)
+    }
+}
+```
+
+**What you learned:**
+- `InnerJoin()` returns only records that match in both streams
+- `LeftJoin()` returns all records from the left stream, with right data when available
+- Join operations work on key fields (converted to strings for comparison)
+- `WithPrefixes()` handles field name conflicts with custom prefixes
+- Right stream is loaded into memory (must be finite and reasonably sized)
+- StreamV2 uses efficient hash join algorithms for O(n + m) performance
+
+**Real-world use cases:**
+- Combining user data with profiles/preferences
+- Joining order data with customer information
+- Merging sales data with product catalogs
+- Associating log entries with user sessions
+
+---
+
+# Step 10: Sorting Your Data
 
 Sometimes you need your data in a specific order. StreamV2 provides flexible sorting capabilities.
 
@@ -1453,7 +1570,7 @@ func main() {
 
 ---
 
-# Step 10: Advanced Stream Operations
+# Step 11: Advanced Stream Operations
 
 Let's explore some more advanced stream operations for powerful data processing.
 
@@ -1604,7 +1721,7 @@ User Account Balances:
 
 ---
 
-# Step 11: Best Practices and Performance Tips
+# Step 12: Best Practices and Performance Tips
 
 ## Writing Production-Ready Stream Code
 
