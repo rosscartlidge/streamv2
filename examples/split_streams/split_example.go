@@ -223,7 +223,7 @@ func demonstrateLazyEvaluation() {
 			count := 0
 			
 			// Take only first 5 records from this category stream
-			limited := stream.Take[stream.Record](5)(categoryStream)
+			limited := stream.Limit[stream.Record](5)(categoryStream)
 			
 			err := stream.ForEach(func(record stream.Record) {
 				if category == "" {

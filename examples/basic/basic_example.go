@@ -59,7 +59,7 @@ func demonstrateBasicOperations() {
 	processedNumbers := stream.Chain(
 		stream.Where(func(x int64) bool { return x > 5 }),
 		stream.Map(func(x int64) int64 { return x * 2 }),
-		stream.Take[int64](3),
+		stream.Limit[int64](3),
 	)(stream.FromSlice([]int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
 
 	results, _ := stream.Collect(processedNumbers)
