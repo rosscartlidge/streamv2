@@ -13,19 +13,16 @@ type RecordTimestampExtractor func(Record) time.Time
 type WatermarkGenerator func(maxEventTime time.Time) time.Time
 
 // NewRecordTimestampExtractor creates a timestamp extractor for Record types
+// that returns standardized UTC timestamps for consistent time comparison
 func NewRecordTimestampExtractor(fieldName string) RecordTimestampExtractor {
 	return func(record Record) time.Time {
 		if timestampValue, exists := record[fieldName]; exists {
-			switch ts := timestampValue.(type) {
-			case time.Time:
-				return ts
-			case string:
-				if parsed, err := time.Parse(time.RFC3339, ts); err == nil {
-					return parsed
-				}
+			if parsed, ok := ParseStandardTime(timestampValue); ok {
+				return parsed
 			}
 		}
-		return time.Now()
+		// Fallback to current UTC time, rounded to seconds for consistency
+		return StandardizeTime(time.Now())
 	}
 }
 
@@ -337,8 +334,9 @@ func EventTimeTumblingWindow(
 					return nil, err
 				}
 
-				// Extract event time
+				// Extract event time and standardize it
 				eventTime := config.TimestampExtractor(element)
+				eventTime = StandardizeTime(eventTime)
 
 				// Update watermark
 				watermark := watermarkTracker.UpdateWatermark(eventTime)
@@ -470,8 +468,9 @@ func EventTimeSlidingWindow(
 					return nil, err
 				}
 
-				// Extract event time
+				// Extract event time and standardize it
 				eventTime := config.TimestampExtractor(element)
+				eventTime = StandardizeTime(eventTime)
 
 				// Update watermark
 				watermark := watermarkTracker.UpdateWatermark(eventTime)
@@ -733,8 +732,9 @@ func EventTimeSessionWindow(
 					return nil, err
 				}
 
-				// Extract event time
+				// Extract event time and standardize it
 				eventTime := config.TimestampExtractor(element)
+				eventTime = StandardizeTime(eventTime)
 
 				// Update watermark
 				watermark := watermarkTracker.UpdateWatermark(eventTime)

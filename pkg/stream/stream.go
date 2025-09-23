@@ -361,20 +361,53 @@ func convertToBool(val any) (bool, bool) {
 	}
 }
 
+// ============================================================================
+// TIME STANDARDIZATION UTILITIES
+// ============================================================================
+
+// StandardizeTime converts any time value to UTC and rounds to nearest second
+// for consistent time comparisons across different timezones and precisions
+func StandardizeTime(t time.Time) time.Time {
+	return t.UTC().Round(time.Second)
+}
+
+// StandardizeTimeNano converts time to UTC and rounds to nearest nanosecond
+// for high-precision time operations while ensuring timezone consistency
+func StandardizeTimeNano(t time.Time) time.Time {
+	return t.UTC().Round(0)
+}
+
+// ParseStandardTime parses various time formats and returns standardized UTC time
+func ParseStandardTime(val any) (time.Time, bool) {
+	t, ok := convertToTime(val)
+	if !ok {
+		return time.Time{}, false
+	}
+	return StandardizeTime(t), true
+}
+
+// convertToTime converts various types to time.Time (internal helper)
 func convertToTime(val any) (time.Time, bool) {
 	switch v := val.(type) {
 	case time.Time:
 		return v, true
 	case string:
+		// Try RFC3339 first (most common for APIs)
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			return t, true
 		}
+		// Try standard SQL datetime format
 		if t, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
 			return t, true
 		}
+		// Try RFC3339 without timezone (assume UTC)
+		if t, err := time.Parse("2006-01-02T15:04:05", v); err == nil {
+			return t.UTC(), true
+		}
 		return time.Time{}, false
 	case int64:
-		return time.Unix(v, 0), true
+		// Unix timestamp - always UTC
+		return time.Unix(v, 0).UTC(), true
 	default:
 		return time.Time{}, false
 	}

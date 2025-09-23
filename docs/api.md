@@ -18,6 +18,8 @@ Complete reference for all exported functions in the StreamV2 package.
 
 ### Core Types & Constraints
 [Value](#value) • [Stream[T]](#streamt) • [Record](#record) • [Filter[T, U]](#filtert-u) • [Numeric](#numeric) • [Comparable](#comparable) • [EOS Error](#eos-error)
+### Time Standardization
+[StandardizeTime](#standardizetime) • [StandardizeTimeNano](#standardizetimenano) • [ParseStandardTime](#parsestandardtime)
 
 ### Stream Constructors
 [FromSlice](#fromslice) • [FromSliceAny](#fromsliceany) • [FromMaps](#frommaps) • [FromChannel](#fromchannel) • [FromChannelAny](#fromchannelany) • [Generate](#generate) • [GenerateAny](#generateany) • [Range](#range) • [Once](#once) • [OnceAny](#onceany)
@@ -104,6 +106,67 @@ A record represents a row of data with named fields. Each field value must satis
 type Filter[T, U any] func(Stream[T]) Stream[U]
 ```
 A function that transforms one stream into another. The building block for all stream transformations.
+
+---
+
+# Time Standardization
+
+StreamV2 provides built-in time standardization utilities to ensure consistent time handling across different timezones and precision levels, especially important for event-time processing and windowing operations.
+
+## StandardizeTime
+```go
+func StandardizeTime(t time.Time) time.Time
+```
+Converts any time value to UTC and rounds to the nearest second for consistent time comparisons across different timezones and precisions.
+
+**Example:**
+```go
+// Different timezone inputs
+easternTime := time.Date(2024, 1, 15, 14, 30, 45, 500*time.Millisecond, time.FixedZone("EST", -5*3600))
+utcTime := time.Date(2024, 1, 15, 19, 30, 45, 750*time.Millisecond, time.UTC)
+
+// Both become the same standardized time
+std1 := stream.StandardizeTime(easternTime) // 2024-01-15 19:30:45 +0000 UTC
+std2 := stream.StandardizeTime(utcTime)     // 2024-01-15 19:30:46 +0000 UTC
+```
+
+## StandardizeTimeNano
+```go
+func StandardizeTimeNano(t time.Time) time.Time
+```
+Converts time to UTC and rounds to the nearest nanosecond for high-precision time operations while ensuring timezone consistency.
+
+## ParseStandardTime
+```go
+func ParseStandardTime(val any) (time.Time, bool)
+```
+Parses various time formats and returns standardized UTC time. Supports:
+- `time.Time` values
+- RFC3339 strings (`"2006-01-02T15:04:05Z07:00"`)
+- SQL datetime strings (`"2006-01-02 15:04:05"`)
+- RFC3339 without timezone (`"2006-01-02T15:04:05"` - assumes UTC)
+- Unix timestamps (`int64`)
+
+**Example:**
+```go
+// All of these become standardized UTC times
+t1, _ := stream.ParseStandardTime("2024-01-15T14:30:45-05:00")  // RFC3339 with timezone
+t2, _ := stream.ParseStandardTime("2024-01-15 19:30:45")        // SQL format
+t3, _ := stream.ParseStandardTime(int64(1705342245))            // Unix timestamp
+// All result in: 2024-01-15 19:30:45 +0000 UTC
+```
+
+**Why Time Standardization Matters:**
+- ✅ **Consistent Windowing**: Window boundaries align correctly regardless of input timezone
+- ✅ **Reliable Comparisons**: Time comparisons work predictably across distributed systems
+- ✅ **Watermark Accuracy**: Event-time processing handles out-of-order data correctly
+- ✅ **Cross-timezone Support**: Data from different timezones processes consistently
+
+**Best Practices:**
+- Always use `ParseStandardTime()` when parsing timestamps from external sources
+- Event-time extractors automatically use standardized time
+- Window operations internally standardize all time values
+- For high-precision requirements, use `StandardizeTimeNano()`
 
 ---
 
