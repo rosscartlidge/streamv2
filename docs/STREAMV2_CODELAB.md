@@ -576,9 +576,65 @@ Number 6: 6 → 6² = 36 → 36 > 20? YES → KEEP
 Final Output: [25, 36, 49, 64, 81, 100]
 ```
 
-## Two Ways to Build Pipelines
+## Even Simpler with Chain
 
-### Method 1: Using `Pipe` (Recommended)
+For operations on the **same data type**, there's an even simpler way using `Chain`:
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/rosscartlidge/streamv2/pkg/stream"
+)
+
+func main() {
+    numbers := []int{-5, -2, 1, 3, 7, 10, 15, 20}
+
+    fmt.Printf("🔗 Chain Example: Clean up and double positive numbers\n")
+    fmt.Printf("Starting with: %v\n\n", numbers)
+
+    result, _ := stream.Collect(
+        stream.Chain(
+            // Step 1: Keep only positive numbers
+            stream.Where(func(x int) bool { return x > 0 }),
+            // Step 2: Double them
+            stream.Map(func(x int) int { return x * 2 }),
+            // Step 3: Keep only those less than 30
+            stream.Where(func(x int) bool { return x < 30 }),
+            // Step 4: Add 1 to each
+            stream.Map(func(x int) int { return x + 1 }),
+        )(stream.FromSlice(numbers)))
+
+    fmt.Printf("Final result: %v\n", result)
+    // Output: [3, 7, 15, 21] (1→2→3, 3→6→7, 7→14→15, 10→20→21)
+}
+```
+
+**Why Chain is Great:**
+- ✅ **No type complexity** - all operations work on `int`
+- ✅ **Super readable** - just list operations in order
+- ✅ **Easy to modify** - add/remove steps easily
+- ✅ **Perfect for data cleaning** pipelines
+
+## Three Ways to Build Pipelines
+
+### Method 1: Using `Chain` (Simplest for same-type operations)
+```go
+stream.Chain(
+    stream.Where(func(x int) bool { return x > 0 }),
+    stream.Map(func(x int) int { return x * x }),
+    stream.Where(func(x int) bool { return x > 20 }),
+    stream.Map(func(x int) int { return x + 1 }),
+)(stream.FromSlice(numbers))
+```
+
+**Perfect for**:
+- ✅ Multiple filters on the same data type
+- ✅ Super simple - no type juggling
+- ✅ Clean, readable pipeline
+
+### Method 2: Using `Pipe` (For type transformations)
 ```go
 stream.Pipe(
     stream.Map(func(x int64) int64 { return x * x }),
@@ -586,12 +642,12 @@ stream.Pipe(
 )(stream.FromSlice(numbers))
 ```
 
-**Advantages**:
+**Perfect for**:
+- ✅ When you need type transformations
 - ✅ Easy to read left-to-right
 - ✅ Clear operation sequence
-- ✅ Easy to add/remove steps
 
-### Method 2: Manual Chaining
+### Method 3: Manual Chaining
 ```go
 stream.Where(func(x int64) bool { return x > 20 })(
     stream.Map(func(x int64) int64 { return x * x })(
