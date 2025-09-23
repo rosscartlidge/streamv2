@@ -1634,3 +1634,319 @@ func emitGroupSummary(groupStats map[string]*groupAccumulator, totalProcessed in
 }
 
 // Note: convertToFloat64 function is defined in stream.go
+
+// ============================================================================
+// SORTING OPERATIONS
+// ============================================================================
+
+// Sort sorts elements using a custom comparison function
+// For finite streams only - infinite streams require windowing
+func Sort[T any](cmp func(a, b T) int) Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		// Collect all elements for sorting
+		var elements []T
+
+		// Read entire stream
+		for {
+			item, err := input()
+			if err != nil {
+				if err == EOS {
+					break
+				}
+				// Return error stream
+				return func() (T, error) {
+					var zero T
+					return zero, err
+				}
+			}
+			elements = append(elements, item)
+		}
+
+		// Sort the collected elements
+		sortSlice(elements, cmp)
+
+		// Return stream of sorted elements
+		index := 0
+		return func() (T, error) {
+			if index >= len(elements) {
+				var zero T
+				return zero, EOS
+			}
+			result := elements[index]
+			index++
+			return result, nil
+		}
+	}
+}
+
+// SortAsc sorts elements in ascending order using Comparable constraint
+func SortAsc[T Comparable]() Filter[T, T] {
+	return Sort(func(a, b T) int {
+		if a < b {
+			return -1
+		} else if a > b {
+			return 1
+		}
+		return 0
+	})
+}
+
+// SortDesc sorts elements in descending order using Comparable constraint
+func SortDesc[T Comparable]() Filter[T, T] {
+	return Sort(func(a, b T) int {
+		if a > b {
+			return -1
+		} else if a < b {
+			return 1
+		}
+		return 0
+	})
+}
+
+// SortBy sorts Records by specified fields in ascending order
+func SortBy(fields ...string) Filter[Record, Record] {
+	return Sort(func(a, b Record) int {
+		for _, field := range fields {
+			aVal, aExists := a[field]
+			bVal, bExists := b[field]
+
+			// Handle missing fields
+			if !aExists && !bExists {
+				continue
+			}
+			if !aExists {
+				return -1
+			}
+			if !bExists {
+				return 1
+			}
+
+			// Compare values if they're comparable
+			if result := compareValues(aVal, bVal); result != 0 {
+				return result
+			}
+		}
+		return 0
+	})
+}
+
+// SortByDesc sorts Records by specified fields in descending order
+func SortByDesc(fields ...string) Filter[Record, Record] {
+	return Sort(func(a, b Record) int {
+		for _, field := range fields {
+			aVal, aExists := a[field]
+			bVal, bExists := b[field]
+
+			// Handle missing fields
+			if !aExists && !bExists {
+				continue
+			}
+			if !aExists {
+				return 1
+			}
+			if !bExists {
+				return -1
+			}
+
+			// Compare values if they're comparable (reverse order)
+			if result := compareValues(aVal, bVal); result != 0 {
+				return -result
+			}
+		}
+		return 0
+	})
+}
+
+// ============================================================================
+// WINDOWED SORTING FOR INFINITE STREAMS
+// ============================================================================
+
+// SortCountWindow sorts elements within count-based windows
+func SortCountWindow[T any](windowSize int, cmp func(a, b T) int) Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		return Pipe(
+			CountWindow[T](windowSize),
+			FlatMap(func(window Stream[T]) Stream[T] {
+				return Sort(cmp)(window)
+			}),
+		)(input)
+	}
+}
+
+// SortTimeWindow sorts elements within time-based windows
+func SortTimeWindow[T any](duration time.Duration, cmp func(a, b T) int) Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		return Pipe(
+			TimeWindow[T](duration),
+			FlatMap(func(window Stream[T]) Stream[T] {
+				return Sort(cmp)(window)
+			}),
+		)(input)
+	}
+}
+
+// TopK maintains the top K elements using a heap-based approach
+// Suitable for infinite streams - provides approximate sorting
+func TopK[T any](k int, cmp func(a, b T) int) Filter[T, T] {
+	return func(input Stream[T]) Stream[T] {
+		heap := newMinHeap(k, cmp)
+
+		// Process all input elements
+		for {
+			item, err := input()
+			if err != nil {
+				if err == EOS {
+					break
+				}
+				// Return error stream
+				return func() (T, error) {
+					var zero T
+					return zero, err
+				}
+			}
+			heap.add(item)
+		}
+
+		// Return sorted results from heap
+		results := heap.sortedResults()
+		index := 0
+		return func() (T, error) {
+			if index >= len(results) {
+				var zero T
+				return zero, EOS
+			}
+			result := results[index]
+			index++
+			return result, nil
+		}
+	}
+}
+
+// BottomK maintains the bottom K elements
+func BottomK[T any](k int, cmp func(a, b T) int) Filter[T, T] {
+	// Reverse the comparison for bottom K
+	reverseCmp := func(a, b T) int {
+		return -cmp(a, b)
+	}
+	return TopK(k, reverseCmp)
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// sortSlice sorts a slice using the comparison function
+func sortSlice[T any](elements []T, cmp func(a, b T) int) {
+	// Simple bubble sort for now - could optimize with quicksort/mergesort
+	n := len(elements)
+	for i := 0; i < n; i++ {
+		for j := 0; j < n-i-1; j++ {
+			if cmp(elements[j], elements[j+1]) > 0 {
+				elements[j], elements[j+1] = elements[j+1], elements[j]
+			}
+		}
+	}
+}
+
+// compareValues compares two Value interfaces
+func compareValues(a, b any) int {
+	switch aVal := a.(type) {
+	case int64:
+		if bVal, ok := b.(int64); ok {
+			if aVal < bVal {
+				return -1
+			} else if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+	case float64:
+		if bVal, ok := b.(float64); ok {
+			if aVal < bVal {
+				return -1
+			} else if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+	case string:
+		if bVal, ok := b.(string); ok {
+			if aVal < bVal {
+				return -1
+			} else if aVal > bVal {
+				return 1
+			}
+			return 0
+		}
+	case bool:
+		if bVal, ok := b.(bool); ok {
+			if !aVal && bVal {
+				return -1
+			} else if aVal && !bVal {
+				return 1
+			}
+			return 0
+		}
+	}
+	return 0 // Unknown types considered equal
+}
+
+// minHeap implements a min-heap for TopK functionality
+type minHeap[T any] struct {
+	items []T
+	maxK  int
+	cmp   func(a, b T) int
+}
+
+func newMinHeap[T any](k int, cmp func(a, b T) int) *minHeap[T] {
+	return &minHeap[T]{
+		items: make([]T, 0, k),
+		maxK:  k,
+		cmp:   cmp,
+	}
+}
+
+func (h *minHeap[T]) add(item T) {
+	if len(h.items) < h.maxK {
+		h.items = append(h.items, item)
+		h.heapifyUp(len(h.items) - 1)
+	} else if h.cmp(item, h.items[0]) > 0 {
+		// Replace minimum with new item
+		h.items[0] = item
+		h.heapifyDown(0)
+	}
+}
+
+func (h *minHeap[T]) heapifyUp(index int) {
+	parent := (index - 1) / 2
+	if index > 0 && h.cmp(h.items[index], h.items[parent]) < 0 {
+		h.items[index], h.items[parent] = h.items[parent], h.items[index]
+		h.heapifyUp(parent)
+	}
+}
+
+func (h *minHeap[T]) heapifyDown(index int) {
+	left := 2*index + 1
+	right := 2*index + 2
+	smallest := index
+
+	if left < len(h.items) && h.cmp(h.items[left], h.items[smallest]) < 0 {
+		smallest = left
+	}
+	if right < len(h.items) && h.cmp(h.items[right], h.items[smallest]) < 0 {
+		smallest = right
+	}
+
+	if smallest != index {
+		h.items[index], h.items[smallest] = h.items[smallest], h.items[index]
+		h.heapifyDown(smallest)
+	}
+}
+
+func (h *minHeap[T]) sortedResults() []T {
+	// Extract elements in reverse order (largest first for TopK)
+	result := make([]T, len(h.items))
+	copy(result, h.items)
+	sortSlice(result, func(a, b T) int { return -h.cmp(a, b) })
+	return result
+}

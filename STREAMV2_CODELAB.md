@@ -1381,7 +1381,71 @@ Revenue by category:
 
 ---
 
-# Step 9: Advanced Stream Operations
+# Step 9: Sorting Your Data
+
+Sometimes you need your data in a specific order. StreamV2 provides flexible sorting capabilities.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/rosscartlidge/streamv2/pkg/stream"
+)
+
+func main() {
+    // Sample student scores
+    scores := []int{85, 92, 78, 96, 81, 88, 94, 76, 90, 87}
+
+    fmt.Printf("=== Sorting Operations ===\n")
+    fmt.Printf("Original scores: %v\n\n", scores)
+
+    // Sort in ascending order
+    ascending, _ := stream.Collect(
+        stream.SortAsc[int]()(
+            stream.FromSlice(scores)))
+    fmt.Printf("Ascending order: %v\n", ascending)
+
+    // Sort in descending order
+    descending, _ := stream.Collect(
+        stream.SortDesc[int]()(
+            stream.FromSlice(scores)))
+    fmt.Printf("Descending order: %v\n\n", descending)
+
+    // Sorting student records by multiple fields
+    students := []stream.Record{
+        stream.NewRecord().String("name", "Alice").Int("grade", 85).String("subject", "Math").Build(),
+        stream.NewRecord().String("name", "Bob").Int("grade", 92).String("subject", "Science").Build(),
+        stream.NewRecord().String("name", "Alice").Int("grade", 78).String("subject", "Science").Build(),
+        stream.NewRecord().String("name", "Charlie").Int("grade", 96).String("subject", "Math").Build(),
+    }
+
+    // Sort by name, then by grade
+    sorted, _ := stream.Collect(
+        stream.SortBy("name", "grade")(
+            stream.FromSlice(students)))
+
+    fmt.Printf("Students sorted by name, then grade:\n")
+    for _, student := range sorted {
+        name := stream.GetOr(student, "name", "")
+        grade := stream.GetOr(student, "grade", int64(0))
+        subject := stream.GetOr(student, "subject", "")
+        fmt.Printf("- %s: %d (%s)\n", name, grade, subject)
+    }
+}
+```
+
+**What you learned:**
+- `SortAsc()` and `SortDesc()` for simple ascending/descending sorts
+- `SortBy(fields...)` for sorting records by multiple fields
+- Sorting works with any comparable data type
+- Multiple sort criteria are applied in order (name first, then grade)
+
+**Important:** Basic sorting loads the entire stream into memory, so it's designed for finite data sets. For infinite streams, you'll need windowed sorting (covered in the advanced codelab).
+
+---
+
+# Step 10: Advanced Stream Operations
 
 Let's explore some more advanced stream operations for powerful data processing.
 
@@ -1532,7 +1596,7 @@ User Account Balances:
 
 ---
 
-# Step 10: Best Practices and Performance Tips
+# Step 11: Best Practices and Performance Tips
 
 ## Writing Production-Ready Stream Code
 

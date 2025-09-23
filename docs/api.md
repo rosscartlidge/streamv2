@@ -7,6 +7,7 @@ Complete reference for all exported functions in the StreamV2 package.
 - [Core Types](#core-types)
 - [Stream Constructors](#stream-constructors)
 - [Core Filters](#core-filters)
+- [Sorting Operations](#sorting-operations)
 - [Aggregators](#aggregators)
 - [I/O Operations](#io-operations)
 - [Advanced Windowing](#advanced-windowing)
@@ -310,6 +311,125 @@ Examples:
 func CrossFlatten(separator string, fields ...string) Filter[Record, Record]
 ```
 Expands stream fields using cross product (cartesian product), creating multiple output records from each input.
+
+---
+
+# Sorting Operations
+
+Functions for sorting stream elements with support for both finite and infinite streams.
+
+## Sort
+```go
+func Sort[T any](cmp func(a, b T) int) Filter[T, T]
+```
+Sorts elements using a custom comparison function. For finite streams only - infinite streams require windowing.
+
+**Example:**
+```go
+sorted := Sort(func(a, b int) int {
+    if a < b { return -1 }
+    if a > b { return 1 }
+    return 0
+})
+```
+
+## SortAsc
+```go
+func SortAsc[T Comparable]() Filter[T, T]
+```
+Sorts elements in ascending order using the Comparable constraint.
+
+**Example:**
+```go
+ascending := SortAsc[int]()
+```
+
+## SortDesc
+```go
+func SortDesc[T Comparable]() Filter[T, T]
+```
+Sorts elements in descending order using the Comparable constraint.
+
+**Example:**
+```go
+descending := SortDesc[int]()
+```
+
+## SortBy
+```go
+func SortBy(fields ...string) Filter[Record, Record]
+```
+Sorts Records by specified fields in ascending order.
+
+**Example:**
+```go
+byNameAge := SortBy("name", "age")
+```
+
+## SortByDesc
+```go
+func SortByDesc(fields ...string) Filter[Record, Record]
+```
+Sorts Records by specified fields in descending order.
+
+**Example:**
+```go
+byNameDesc := SortByDesc("name", "age")
+```
+
+## Windowed Sorting (For Infinite Streams)
+
+### SortCountWindow
+```go
+func SortCountWindow[T any](windowSize int, cmp func(a, b T) int) Filter[T, T]
+```
+Sorts elements within count-based windows. Each window is sorted independently.
+
+**Example:**
+```go
+windowSorted := SortCountWindow(100, func(a, b int) int {
+    return a - b  // ascending
+})
+```
+
+### SortTimeWindow
+```go
+func SortTimeWindow[T any](duration time.Duration, cmp func(a, b T) int) Filter[T, T]
+```
+Sorts elements within time-based windows.
+
+**Example:**
+```go
+timeSorted := SortTimeWindow(5*time.Second, func(a, b Event) int {
+    return int(a.Timestamp - b.Timestamp)
+})
+```
+
+### TopK
+```go
+func TopK[T any](k int, cmp func(a, b T) int) Filter[T, T]
+```
+Maintains the top K elements using a heap-based approach. Suitable for infinite streams - provides approximate sorting.
+
+**Example:**
+```go
+top10 := TopK(10, func(a, b Score) int {
+    return int(b.Value - a.Value)  // highest scores first
+})
+```
+
+### BottomK
+```go
+func BottomK[T any](k int, cmp func(a, b T) int) Filter[T, T]
+```
+Maintains the bottom K elements.
+
+**Example:**
+```go
+bottom5 := BottomK(5, func(a, b Score) int {
+    return int(a.Value - b.Value)  // lowest scores first
+})
+```
 
 ---
 

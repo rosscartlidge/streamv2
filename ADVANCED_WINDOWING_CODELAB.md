@@ -970,6 +970,101 @@ func debugTimestampExtractor(record stream.Record) time.Time {
 
 ---
 
+## Advanced Sorting for Infinite Streams
+
+Traditional sorting requires loading all data into memory, which is impossible with infinite streams. StreamV2 provides windowed sorting strategies to handle this challenge.
+
+### Window-Based Sorting
+
+Sort data within bounded windows - perfect for real-time analytics:
+
+```go
+package main
+
+import (
+    "fmt"
+    "math/rand"
+    "time"
+    "github.com/rosscartlidge/streamv2/pkg/stream"
+)
+
+func main() {
+    fmt.Printf("=== Windowed Sorting for Infinite Streams ===\\n\\n")
+
+    // Simulate real-time sensor readings (temperature values)
+    temperatures := []float64{23.1, 24.5, 22.8, 25.2, 21.9, 26.1, 23.7, 24.8, 22.3, 25.9}
+
+    // Sort within count-based windows (useful for batch processing)
+    fmt.Printf("🔢 Count-based windowed sorting:\\n")
+    sortedWindows, _ := stream.Collect(
+        stream.SortCountWindow(4, func(a, b float64) int {
+            if a < b { return -1 }
+            if a > b { return 1 }
+            return 0
+        })(stream.FromSlice(temperatures)))
+
+    fmt.Printf("Original: %v\\n", temperatures)
+    fmt.Printf("Sorted in windows of 4: %v\\n\\n", sortedWindows)
+
+    // Real-world example: Top-K tracking for leaderboards
+    fmt.Printf("🏆 Top-K for infinite leaderboards:\\n")
+    scores := []int{85, 92, 78, 96, 81, 88, 94, 76, 90, 87, 95, 83, 91, 79, 93}
+
+    topPlayers, _ := stream.Collect(
+        stream.TopK(5, func(a, b int) int {
+            return a - b  // ascending comparison for max-heap behavior
+        })(stream.FromSlice(scores)))
+
+    fmt.Printf("All scores: %v\\n", scores)
+    fmt.Printf("Top 5 scores: %v\\n\\n", topPlayers)
+}
+```
+
+### Time-Based Windowed Sorting
+
+For event-time processing, sort within time windows:
+
+```go
+// Simulate timestamped events
+type SensorReading struct {
+    Timestamp time.Time
+    Value     float64
+    SensorID  string
+}
+
+// In practice, you'd use SortTimeWindow for real-time data:
+// stream.SortTimeWindow(5*time.Second, func(a, b SensorReading) int {
+//     return int(a.Value*100 - b.Value*100)  // Sort by sensor value
+// })
+```
+
+### When to Use Each Approach
+
+**Count Windows (`SortCountWindow`):**
+- ✅ Batch processing scenarios
+- ✅ Fixed-size result sets
+- ✅ Memory-bounded sorting
+
+**Time Windows (`SortTimeWindow`):**
+- ✅ Real-time analytics
+- ✅ Event-time ordering
+- ✅ Time-series data
+
+**Top-K (`TopK`/`BottomK`):**
+- ✅ Leaderboards and rankings
+- ✅ Anomaly detection (extreme values)
+- ✅ Memory-efficient approximate sorting
+- ✅ Streaming recommendations
+
+### Performance Considerations
+
+- **Window size** affects latency vs. accuracy trade-offs
+- **Top-K** uses heap-based algorithms for O(n log k) performance
+- **Time windows** require buffering and can handle late-arriving data
+- **Memory usage** scales with window size, not total stream length
+
+---
+
 ## Summary
 
 You've learned how to use StreamV2's advanced windowing capabilities:
@@ -979,6 +1074,8 @@ You've learned how to use StreamV2's advanced windowing capabilities:
 - ✅ **Advanced triggers** for fine-grained control
 - ✅ **Out-of-order handling** with watermarks
 - ✅ **Session detection** for activity-based grouping
+- ✅ **Windowed sorting** for infinite stream ordering
+- ✅ **Top-K algorithms** for streaming leaderboards
 - ✅ **Performance optimization** and best practices
 
 ### Next Steps
