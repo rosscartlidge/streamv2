@@ -7,6 +7,7 @@ Complete reference for all exported functions in the StreamV2 package.
 - [Core Types](#core-types)
 - [Stream Constructors](#stream-constructors)
 - [Core Filters](#core-filters)
+- [Join Operations](#join-operations)
 - [Sorting Operations](#sorting-operations)
 - [Aggregators](#aggregators)
 - [I/O Operations](#io-operations)
@@ -23,6 +24,9 @@ Complete reference for all exported functions in the StreamV2 package.
 
 ### Core Filters
 [Map](#map) • [Where](#where) • [Take](#take) • [Skip](#skip) • [Pipe](#pipe) • [Select](#select) • [Update](#update) • [ExtractField](#extractfield) • [Tee](#tee) • [FlatMap](#flatmap) • [DotFlatten](#dotflatten) • [CrossFlatten](#crossflatten)
+
+### Join Operations
+[InnerJoin](#innerjoin) • [LeftJoin](#leftjoin) • [RightJoin](#rightjoin) • [FullJoin](#fulljoin) • [WithPrefixes](#withprefixes)
 
 ### Sorting Operations
 [Sort](#sort) • [SortAsc](#sortasc) • [SortDesc](#sortdesc) • [SortBy](#sortby) • [SortByDesc](#sortbydesc) • [SortCountWindow](#sortcountwindow) • [SortTimeWindow](#sorttimewindow) • [TopK](#topk) • [BottomK](#bottomk)
@@ -337,6 +341,95 @@ Examples:
 func CrossFlatten(separator string, fields ...string) Filter[Record, Record]
 ```
 Expands stream fields using cross product (cartesian product), creating multiple output records from each input.
+
+---
+
+# Join Operations
+
+Functions for joining two streams on matching keys. All join operations work with Record streams and support SQL-style join semantics.
+
+## InnerJoin
+```go
+func InnerJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record]
+```
+Performs an inner join between left stream and right stream. Only records with matching keys in both streams are returned.
+
+**Example:**
+```go
+users := stream.FromSlice([]stream.Record{
+    stream.NewRecord().Int("id", 1).String("name", "Alice").Build(),
+    stream.NewRecord().Int("id", 2).String("name", "Bob").Build(),
+})
+
+profiles := stream.FromSlice([]stream.Record{
+    stream.NewRecord().Int("userId", 1).String("department", "Engineering").Build(),
+    stream.NewRecord().Int("userId", 2).String("department", "Sales").Build(),
+})
+
+// Join users with profiles on id = userId
+joined := stream.InnerJoin(profiles, "id", "userId")(users)
+// Result: Records with both user and profile data
+```
+
+## LeftJoin
+```go
+func LeftJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record]
+```
+Performs a left join between left stream and right stream. All records from left stream are returned, with matching right records when available.
+
+**Example:**
+```go
+// All users, with profile data when available
+joined := stream.LeftJoin(profiles, "id", "userId")(users)
+// Result: All user records, some with profile data, some without
+```
+
+## RightJoin
+```go
+func RightJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record]
+```
+Performs a right join between left stream and right stream. All records from right stream are returned, with matching left records when available.
+
+**Example:**
+```go
+// All profiles, with user data when available
+joined := stream.RightJoin(profiles, "id", "userId")(users)
+// Result: All profile records, some with user data, some without
+```
+
+## FullJoin
+```go
+func FullJoin(rightStream Stream[Record], leftKey, rightKey string, options ...JoinOption) Filter[Record, Record]
+```
+Performs a full outer join between left stream and right stream. All records from both streams are returned, with matching when available.
+
+**Example:**
+```go
+// All users and all profiles, matched when possible
+joined := stream.FullJoin(profiles, "id", "userId")(users)
+// Result: Union of all records from both streams
+```
+
+## WithPrefixes
+```go
+func WithPrefixes(leftPrefix, rightPrefix string) JoinOption
+```
+Sets custom prefixes for handling field name conflicts during joins. Default prefixes are "left." and "right.".
+
+**Example:**
+```go
+// Custom prefixes to avoid field name conflicts
+joined := stream.InnerJoin(profiles, "id", "userId",
+    stream.WithPrefixes("user.", "profile."))(users)
+// Conflicting fields become: user.name, profile.name
+```
+
+### Join Performance Notes
+
+- **Memory Usage**: Right stream is collected into memory - must be finite and reasonably sized
+- **Algorithm**: Uses hash join for efficient O(n + m) performance
+- **Key Handling**: Join keys are converted to strings for comparison
+- **Field Conflicts**: Duplicate field names are prefixed (default: "left.", "right.")
 
 ---
 
