@@ -10,6 +10,11 @@ Welcome to the StreamV2 Advanced Features codelab! This tutorial covers powerful
 - 🎯 **Context Control** - Resource management with `WithContext()`
 - 🔧 **Advanced Patterns** - Real-world streaming architectures
 
+📚 **Other StreamV2 Codelabs:**
+- 🚀 [Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
+- ⏰ [Advanced Windowing](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing
+- 📖 [API Reference](api.md) - Complete function documentation
+
 ## Prerequisites
 
 - Complete the [main StreamV2 codelab](STREAMV2_CODELAB.md)
@@ -643,10 +648,15 @@ You've learned StreamV2's most advanced features:
 
 ### Related Resources
 
-- [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
-- [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing
-- [API Reference](api.md) - Complete function documentation
-- [Examples](../stream_examples/) - Real-world usage patterns
+📚 **StreamV2 Documentation:**
+- 🚀 [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Start here! Core concepts and basic operations
+- ⏰ [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing and real-time analytics
+- 📖 [API Reference](api.md) - Complete function documentation with examples
+
+🛠️ **Development:**
+- 📁 [Examples](../stream_examples/) - Real-world usage patterns
+- 📖 [Contributing Guide](../CONTRIBUTING.md) - How to contribute to StreamV2
+- 🏗️ [Design Documents](../design_docs/) - Architecture and implementation details
 
 ---
 

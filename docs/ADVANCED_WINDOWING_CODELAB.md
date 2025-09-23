@@ -12,6 +12,11 @@ Welcome to the advanced windowing codelab! This tutorial covers StreamV2's power
 - ⏰ **Late Data Handling** - Strategies for delayed events
 - 🎯 **WindowBuilder** - Fluent API for complex configurations
 
+📚 **Other StreamV2 Codelabs:**
+- 🚀 [Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
+- 🔥 [Advanced Features](ADVANCED_FEATURES_CODELAB.md) - Split, Chain, Parallel, and Context management
+- 📖 [API Reference](api.md) - Complete function documentation
+
 ## Prerequisites
 
 - Complete the [main StreamV2 codelab](STREAMV2_CODELAB.md)
@@ -1095,9 +1100,15 @@ You've learned how to use StreamV2's advanced windowing capabilities:
 
 ### Related Resources
 
-- [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Core concepts and basic operations
-- [API Reference](api.md) - Complete function documentation
-- [Examples](../stream_examples/) - Real-world usage patterns
+📚 **StreamV2 Documentation:**
+- 🚀 [StreamV2 Main Codelab](STREAMV2_CODELAB.md) - Start here! Core concepts and basic operations
+- 🔥 [Advanced Features Codelab](ADVANCED_FEATURES_CODELAB.md) - Split, Chain, Parallel, and Context management
+- 📖 [API Reference](api.md) - Complete function documentation with examples
+
+🛠️ **Development:**
+- 📁 [Examples](../stream_examples/) - Real-world usage patterns
+- 📖 [Contributing Guide](../CONTRIBUTING.md) - How to contribute to StreamV2
+- 🏗️ [Design Documents](../design_docs/) - Architecture and implementation details
 
 ---
 

@@ -10,7 +10,10 @@ Welcome to the StreamV2 codelab! This hands-on tutorial will teach you modern st
 - ✅ Building processing pipelines
 - ✅ Real-world data analysis patterns
 
-📚 **Advanced Topics**: For complex windowing, event-time processing, and real-time analytics, see the [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md)
+📚 **More StreamV2 Codelabs:**
+- 🔥 [Advanced Features](ADVANCED_FEATURES_CODELAB.md) - Split, Chain, Parallel, and Context management
+- ⏰ [Advanced Windowing](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing and real-time analytics
+- 📖 [API Reference](api.md) - Complete function documentation
 
 ## Tutorial Navigation
 
@@ -2223,9 +2226,14 @@ Congratulations! You've learned the fundamentals of stream processing with Strea
 
 ## Resources
 
-- [API Documentation](api.md)
-- [Performance Guide](../design_docs/performance.md)
-- [Examples Repository](../stream_examples/)
-- [Contributing Guide](../CONTRIBUTING.md)
+📚 **Continue Learning:**
+- 📖 [API Documentation](api.md) - Complete function reference with examples
+- 🔥 [Advanced Features Codelab](ADVANCED_FEATURES_CODELAB.md) - Split, Chain, Parallel, and Context management
+- ⏰ [Advanced Windowing Codelab](ADVANCED_WINDOWING_CODELAB.md) - Time-based stream processing and real-time analytics
+
+🛠️ **Development:**
+- 📁 [Examples Repository](../stream_examples/) - Real-world usage patterns
+- 📈 [Performance Guide](../design_docs/performance.md) - Optimization tips and benchmarks
+- 📖 [Contributing Guide](../CONTRIBUTING.md) - How to contribute to StreamV2
 
 Start building amazing data processing applications with StreamV2! 🎉
